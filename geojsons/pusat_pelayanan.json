@@ -1,0 +1,19 @@
+{
+"type": "FeatureCollection",
+"name": "_1771_5RD_PT_SR_PUSATPELAYANAN_RATU_GADING_SEGARAPATI_2024",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs,crs:EPSG::4326,crs:EPSG::3855" } },
+"xy_coordinate_resolution": 2.5e-12,
+"z_coordinate_resolution": 0.0001,
+"features": [
+{ "type": "Feature", "properties": { "NAMOBJ": "Pusat Pelayanan Kota/Kawasan Perkotaan", "ORDE01": 11022000, "ORDE02": 11022000, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.25978598673, -3.799258781082, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Pusat Lingkungan Kecamatan", "ORDE01": 11024000, "ORDE02": 11024100, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.26842437716, -3.812037283255, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Sub Pusat Pelayanan Kota/Kawasan Perkotaan", "ORDE01": 11023000, "ORDE02": 11023000, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.253616930648, -3.792297335372, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Pusat Lingkungan Kecamatan", "ORDE01": 11024000, "ORDE02": 11024100, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.26198183082, -3.785893696883, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Sub Pusat Pelayanan Kota/Kawasan Perkotaan", "ORDE01": 11023000, "ORDE02": 11023000, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.274594067062, -3.81211521785, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Pusat Lingkungan Kecamatan", "ORDE01": 11024000, "ORDE02": 11024100, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.281063947048, -3.79639456165, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Sub Pusat Pelayanan Kota/Kawasan Perkotaan", "ORDE01": 11023000, "ORDE02": 11023000, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.29243027695, -3.8080990199, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Pusat Lingkungan Kecamatan", "ORDE01": 11024000, "ORDE02": 11024100, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.28812510529, -3.813113486133, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Sub Pusat Pelayanan Kota/Kawasan Perkotaan", "ORDE01": 11023000, "ORDE02": 11023000, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.296136892418, -3.82112118601, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Pusat Lingkungan Kecamatan", "ORDE01": 11024000, "ORDE02": 11024100, "JNSRSR": 11000000, "STSJRN": 3, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Analisis RDTR, 2023" }, "geometry": { "type": "Point", "coordinates": [ 102.28885200882, -3.82047612324, 0.0 ] } }
+]
+}

@@ -1,0 +1,9 @@
+TODO :
+    - dashboard endpoint (admin)
+    - get active course meeting (user)
+
+
+DONE :
+    - remove user from shift (admin)
+    - kehadrian harian kasih param date (admin)
+    - kehadiran bulanan (user)

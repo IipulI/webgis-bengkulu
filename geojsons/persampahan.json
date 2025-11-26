@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "_1771_5RD_PT_SR_PERSAMPAHAN_RATU_GADING_SEGARAPATI_2024",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs,crs:EPSG::4326,crs:EPSG::3855" } },
+"xy_coordinate_resolution": 2.5e-12,
+"z_coordinate_resolution": 0.0001,
+"features": [
+{ "type": "Feature", "properties": { "NAMOBJ": "Tempat Pengelolaan Sampah Reuse, Reduce, Recycle (TPS3R)", "ORDE01": 16042000, "ORDE02": 16042000, "JNSRSR": 16040000, "STSJRN": 2, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Dinas Lingkungan Hidup Kota Bengkulu, 2024" }, "geometry": { "type": "Point", "coordinates": [ 102.3025433135, -3.81081861915, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Tempat Pengelolaan Sampah Reuse, Reduce, Recycle (TPS3R)", "ORDE01": 16042000, "ORDE02": 16042000, "JNSRSR": 16040000, "STSJRN": 2, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Dinas Lingkungan Hidup Kota Bengkulu, 2024" }, "geometry": { "type": "Point", "coordinates": [ 102.264990800407, -3.808439799975, 0.0 ] } },
+{ "type": "Feature", "properties": { "NAMOBJ": "Tempat Pengelolaan Sampah Reuse, Reduce, Recycle (TPS3R)", "ORDE01": 16042000, "ORDE02": 16042000, "JNSRSR": 16040000, "STSJRN": 2, "WADMPR": "Provinsi Bengkulu", "WADMKK": "Kota Bengkulu", "REMARK": "Tidak Ada", "SBDATA": "Dinas Lingkungan Hidup Kota Bengkulu, 2024" }, "geometry": { "type": "Point", "coordinates": [ 102.30389163405, -3.821373493495, 0.0 ] } }
+]
+}

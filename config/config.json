@@ -1,0 +1,36 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "123456",
+    "database": "webgis_bengkulu",
+    "host": "127.0.0.1",
+    "dialect": "postgres",
+    "timezone": "Asia/Jakarta",
+    "logging": true,
+    "dialectOption": {
+      "useUTC": false
+    }
+  },
+  "test": {
+    "username": "postgres",
+    "password": "123456",
+    "database": "webgis_bengkulu",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "L1ght&heLum3n5",
+    "database": "backend_cssl",
+    "host": "backend-simakad.postgres.database.azure.com",
+    "dialect": "postgres",
+    "timezone": "Asia/Jakarta",
+    "dialectOptions": {
+      "useUTC": false,
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
+  }
+}
