@@ -2,7 +2,6 @@ import db from "../models/index.js";
 
 const { Layer, SpatialPoint, SpatialLine, SpatialPolygon, sequelize } = db;
 
-// 1. Get All Layers (Untuk Menu Layer Control)
 export const getLayers = async (req, res) => {
     try {
         const layers = await Layer.findAll({
@@ -21,27 +20,21 @@ export const getLayers = async (req, res) => {
     }
 };
 
-// 2. Get GeoJSON Data (Data Peta Inti)
 export const getLayerGeoJSON = async (req, res) => {
     const { id } = req.params;
 
     try {
-        // A. Cek Layer dulu
         const layer = await Layer.findByPk(id);
         if (!layer) {
             return res.status(404).json({ success: false, message: "Layer tidak ditemukan" });
         }
 
-        // B. Tentukan Tabel mana yang harus di-query
         let TargetModel;
         if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
         else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
         else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
         else return res.status(400).json({ success: false, message: "Tipe geometri layer tidak valid" });
 
-        // C. Query Super Cepat dengan PostGIS JSON Generator
-        // Kita menyuruh PostGIS merakit GeoJSON FeatureCollection langsung di database
-        // Teknik ini 10x lebih cepat daripada looping di Javascript
         const query = `
             SELECT json_build_object(
                 'type', 'FeatureCollection',
@@ -57,7 +50,7 @@ export const getLayerGeoJSON = async (req, res) => {
                 ) AS feature
                 FROM ${TargetModel.tableName}
                 WHERE layer_id = :layerId
-                AND deleted_at IS NULL -- Jangan lupa soft delete check
+                AND deleted_at IS NULL
             ) features;
         `;
 
@@ -66,10 +59,8 @@ export const getLayerGeoJSON = async (req, res) => {
             type: sequelize.QueryTypes.SELECT
         });
 
-        // Output langsung GeoJSON utuh
         const geojsonData = result[0].geojson;
 
-        // Tambahkan CRS/Metadata dari tabel Layer jika ada
         if (layer.metadata && layer.metadata.crs) {
             geojsonData.crs = layer.metadata.crs;
         }
