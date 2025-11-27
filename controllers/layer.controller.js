@@ -1,74 +1,33 @@
 import db from "../models/index.js";
+import ResponseBuilder from "../utils/response.js";
+import * as layerService from '../services/layer.service.js'
 
-const { Layer, SpatialPoint, SpatialLine, SpatialPolygon, sequelize } = db;
+export const getLayers = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res);
 
-export const getLayers = async (req, res) => {
     try {
-        const layers = await Layer.findAll({
-            where: { isActive: true },
-            attributes: ['id', 'name', 'geometryType', 'color', 'metadata'], // Hemat bandwidth
-            order: [['name', 'ASC']]
-        });
+        const data = await layerService.getLayer()
 
-        return res.json({
-            success: true,
-            data: layers
-        });
-    } catch (error) {
-        console.error("Error fetching layers:", error);
-        return res.status(500).json({ success: false, message: "Server Error" });
+        responseBuilder
+            .status('success')
+            .code(200)
+            .message('berhasil mengambil data')
+            .json(data)
+    }
+    catch (error) {
+        next(error);
     }
 };
 
-export const getLayerGeoJSON = async (req, res) => {
+export const getLayerGeoJSON = async (req, res, next) => {
     const { id } = req.params;
 
     try {
-        const layer = await Layer.findByPk(id);
-        if (!layer) {
-            return res.status(404).json({ success: false, message: "Layer tidak ditemukan" });
-        }
+        const data = await layerService.getLayerDetail(id)
 
-        let TargetModel;
-        if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
-        else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
-        else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
-        else return res.status(400).json({ success: false, message: "Tipe geometri layer tidak valid" });
-
-        const query = `
-            SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'name', :layerName,
-                'features', COALESCE(json_agg(features.feature), '[]')
-            ) AS geojson
-            FROM (
-                SELECT json_build_object(
-                    'type', 'Feature',
-                    'id', id,
-                    'geometry', ST_AsGeoJSON(geom)::json,
-                    'properties', properties
-                ) AS feature
-                FROM ${TargetModel.tableName}
-                WHERE layer_id = :layerId
-                AND deleted_at IS NULL
-            ) features;
-        `;
-
-        const result = await sequelize.query(query, {
-            replacements: { layerId: id, layerName: layer.name },
-            type: sequelize.QueryTypes.SELECT
-        });
-
-        const geojsonData = result[0].geojson;
-
-        if (layer.metadata && layer.metadata.crs) {
-            geojsonData.crs = layer.metadata.crs;
-        }
-
-        return res.json(geojsonData);
-
-    } catch (error) {
-        console.error("Error generating GeoJSON:", error);
-        return res.status(500).json({ success: false, message: "Gagal memuat data spasial" });
+        return res.json(data)
+    }
+    catch (error) {
+        next(error)
     }
 };
