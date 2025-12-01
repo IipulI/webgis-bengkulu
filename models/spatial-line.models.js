@@ -4,7 +4,14 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class SpatialLine extends Model {
         static associate(models) {
-            // define assoc here
+            this.hasMany(models.FeatureAttachment, {
+                foreignKey: "feature_id",
+                sourceKey: "id",
+                as: "attachments",
+                constraints: false
+            })
+
+            this.belongsTo(models.Layer, { foreignKey: 'layer_id', as: 'layer' });
         }
     }
 

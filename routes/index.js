@@ -7,10 +7,12 @@ import { Router } from 'express';
 
 import layerRouter from "./layers.route.js"
 import featureRouter from "./features.route.js"
+import attachmentRoutes from "./attachment.route.js"
 
 const router = Router();
 
 router.use('/layer', layerRouter)
 router.use('/feature', featureRouter)
+router.use('/attachment', attachmentRoutes);
 
 export default router;

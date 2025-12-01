@@ -10,18 +10,12 @@ const ensureDir = (dirPath) => {
     }
 };
 
-/**
- * Creates a highly reusable Multer upload middleware based on a field configuration.
- * @param {Array<object>} fieldConfigs - An array of configuration objects for each expected field.
- * Each object should have: { name: string, maxCount: number, destination: string, allowedMimeTypes: Array<string> }
- */
 export const createUploadMiddleware = (fieldConfigs) => {
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
-            // Find the configuration for the current file's fieldname
             const config = fieldConfigs.find(f => f.name === file.fieldname);
             if (!config) {
-                return cb(new BadRequestError(`Unexpected file field: ${file.fieldname}`), null);
+                return cb(new BadRequestError(`Field file tidak dikenali: ${file.fieldname}`), null);
             }
             // Use the destination from the config
             const dest = path.join('uploads', config.destination);
@@ -35,28 +29,25 @@ export const createUploadMiddleware = (fieldConfigs) => {
     });
 
     const fileFilter = (req, file, cb) => {
-        // Find the configuration for the current file's fieldname
         const config = fieldConfigs.find(f => f.name === file.fieldname);
-        if (!config) {
-            // This case should be caught by the destination logic, but as a safeguard:
-            return cb(new BadRequestError(`File field ${file.fieldname} is not configured.`), false);
-        }
+        if (!config) return cb(new BadRequestError(`Field tidak terkonfigurasi.`), false);
 
-        // Check if the file's mime type is in the allowed list
         if (config.allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new BadRequestError(`Invalid file type for ${file.fieldname}. Allowed types: ${config.allowedMimeTypes.join(', ')}`), false);
+            cb(new BadRequestError(`Tipe file salah. Yang dibolehkan: ${config.allowedMimeTypes.join(', ')}`), false);
         }
     };
 
-    // Prepare the fields array for Multer from our rich configuration
     const multerFields = fieldConfigs.map(f => ({ name: f.name, maxCount: f.maxCount }));
+
+    // Ambil max size terbesar dari config atau default 20MB
+    const maxFileSize = fieldConfigs.reduce((max, f) => Math.max(max, f.maxSize || 0), 0) || 20 * 1024 * 1024;
 
     return multer({
         storage: storage,
         fileFilter: fileFilter,
-        limits: { fileSize: 1024 * 1024 * 20 },
+        limits: { fileSize: maxFileSize }, // Limit dinamis
     }).fields(multerFields);
 };
 

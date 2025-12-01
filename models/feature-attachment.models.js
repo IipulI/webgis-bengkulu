@@ -23,6 +23,10 @@ export default (sequelize) => {
                 type: DataTypes.UUID,
                 field: "feature_id"
             },
+            originalName: {
+                type: DataTypes.STRING,
+                field: 'original_name'
+            },
             fileUrl: {
                 type: DataTypes.TEXT,
                 field: "file_url"

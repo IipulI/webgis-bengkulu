@@ -3,7 +3,7 @@ import { sequelize } from "../config/database.js";
 import { NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
 
 
-const { Layer, SpatialLine, SpatialPoint, SpatialPolygon } = models
+const { FeatureAttachment, Layer, SpatialLine, SpatialPoint, SpatialPolygon } = models
 
 // export const getAllSpatialFeatureByLayer = async (layerId) => {
 //     const layer = await Layer.findByPk(layerId);
@@ -51,33 +51,32 @@ const { Layer, SpatialLine, SpatialPoint, SpatialPolygon } = models
 // }
 
 export const getOneSpatialFeature = async (layerId, featureId) => {
-    const layer = await Layer.findByPk(layerId)
-    if (!layer) {
-        throw new NotFoundError("Layer tidak ditemukan")
-    }
+    const layer = await Layer.findByPk(layerId);
+    if (!layer) throw new NotFoundError("Layer tidak ditemukan");
 
-    let spatial
+    let TargetModel;
     switch(layer.geometryType) {
-        case 'POINT':
-            spatial = SpatialPoint;
-            break;
-        case 'LINE':
-            spatial = SpatialLine;
-            break;
-        case 'POLYGON':
-            spatial = SpatialPolygon;
-            break;
-        default :
-            throw new UnprocessableEntityError('Terjadi kesalahan pada tipe layer');
+        case 'POINT': TargetModel = SpatialPoint; break;
+        case 'LINE': TargetModel = SpatialLine; break;
+        case 'POLYGON': TargetModel = SpatialPolygon; break;
+        default: throw new UnprocessableEntityError('Tipe layer error');
     }
 
-    const feature = await spatial.findByPk(featureId)
-    if (!feature) {
-        throw new NotFoundError("Spasial tidak ditemukan")
-    }
+    const feature = await TargetModel.findOne({
+        where: { id: featureId, layerId: layerId },
+        include: [
+            {
+                model: FeatureAttachment,
+                as: 'attachments',
+                attributes: ['id', 'fileUrl', 'fileType', 'description']
+            }
+        ]
+    });
+
+    if (!feature) throw new NotFoundError("Data spasial tidak ditemukan");
 
     return feature;
-}
+};
 
 export const addSpatialFeatures = async (layerId, spatialData) => {
     const layer = await Layer.findByPk(layerId);
