@@ -4,7 +4,20 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class Layer extends Model {
         static associate(models) {
-            // define assoc here
+            this.hasMany(models.SpatialLine, {
+                foreignKey: 'layer_id',
+                as: 'spatialLines'
+            })
+
+            this.hasMany(models.SpatialPoint, {
+                foreignKey: 'layer_id',
+                as: 'spatialPoint'
+            })
+
+            this.hasMany(models.SpatialPolygon, {
+                foreignKey: 'layer_id',
+                as: 'spatialPolygon'
+            })
         }
     }
 

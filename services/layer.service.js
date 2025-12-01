@@ -1,6 +1,7 @@
 import models from '../models/index.js'
-import { BadRequestError, NotFoundError } from "../utils/custom-error.js";
+import { BadRequestError, ConflictError, InternalServerError, NotFoundError } from "../utils/custom-error.js";
 import { sequelize } from "../config/database.js";
+import { Op } from 'sequelize'
 
 const { Layer, SpatialPoint, SpatialLine, SpatialPolygon } = models;
 
@@ -13,7 +14,47 @@ export const getLayer = async () => {
         });
     } catch (error) {
         console.error("Error fetching layers:", error);
-        return new Error(error.message);
+        return error
+    }
+}
+
+export const getLayerDetailDashboard = async (id) => {
+    const layer = await Layer.findByPk(id, {
+        attributes: ['id', 'geometryType'],
+    });
+    if (!layer) {
+        throw new NotFoundError("Layer tidak ditemukan")
+    }
+
+    let TargetModel;
+    let alias;
+    if (layer.geometryType === 'POINT') {
+        TargetModel = SpatialPoint;
+        alias = "spatialPoint";
+    }
+    else if (layer.geometryType === 'LINE') {
+        TargetModel = SpatialLine;
+        alias = "spatialLine";
+    }
+    else if (layer.geometryType === 'POLYGON') {
+        TargetModel = SpatialPolygon;
+        alias = "spatialPolygon";
+    }
+    else {
+        throw new BadRequestError("Tipe geometri layer tidak valid")
+    }
+
+    try {
+        return await Layer.findByPk(id, {
+            include: {
+                model: TargetModel,
+                as: alias
+            }
+        })
+    }
+    catch (error) {
+        console.error("Error fetching layer:", error);
+        return error
     }
 }
 
@@ -73,5 +114,87 @@ export const getLayerDetail = async (id) => {
     } catch (error) {
         console.error("Error generating GeoJSON:", error);
         return error;
+    }
+}
+
+export const createNewLayer = async(layerData) => {
+    const existingLayer = await Layer.findOne({
+        where: {
+            name: { [Op.iLike]: layerData.name },
+        }
+    })
+    if (existingLayer) {
+        throw new ConflictError(`Layer dengan nama ${layerData.name} sudah ada, tolong gunakan nama lain`)
+    }
+
+    try {
+        return await Layer.create({
+            name: layerData.name,
+            description: layerData.description,
+            geometryType: layerData.geometryType,
+            color: layerData.color,
+            iconUrl: layerData.iconUrl,
+            metadata: layerData.metadata,
+        })
+    }
+    catch (error) {
+        console.error(error)
+        throw error;
+    }
+}
+
+export const updateLayer = async (layerId, layerData) => {
+    const existingLayer = await Layer.findByPk(layerId)
+    if (!existingLayer) {
+        throw new NotFoundError("Layer tidak ditemukan")
+    }
+
+    try {
+        return await existingLayer.update({
+            name: layerData.name,
+            description: layerData.description,
+            geometryType: layerData.geometryType,
+            color: layerData.color,
+            iconUrl: layerData.iconUrl,
+            metadata: layerData.metadata,
+        })
+    }
+    catch (error) {
+        console.error(error)
+        throw error;
+    }
+}
+
+export const deleteLayer = async (layerId) => {
+    const layer = await Layer.findByPk(layerId, {
+        attributes: ['id']
+    })
+    if (!layer) {
+        throw new NotFoundError("Layer tidak ditemukan")
+    }
+
+    await layer.destroy()
+}
+
+export const toggleLayer = async (layerId) => {
+    const layer = await Layer.findByPk(layerId)
+    if (!layer) {
+        throw new NotFoundError("Layer tidak ditemukan")
+    }
+
+    try {
+        if (layer.isActive === true) {
+            return await layer.update({isActive: false})
+        }
+        else if (layer.isActive === false) {
+            return await layer.update({isActive: true})
+        }
+        else {
+            throw new InternalServerError()
+        }
+    }
+    catch (error) {
+        console.error(error)
+        throw error;
     }
 }

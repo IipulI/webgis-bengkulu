@@ -5,10 +5,12 @@ import { Router } from 'express';
 // import { attachCurrentUser } from "../middleware/attach-user.middleware.js";
 // import { checkRole } from "../middleware/authorization.middleware.js";
 
-import layerRouter from "./layer.route.js"
+import layerRouter from "./layers.route.js"
+import featureRouter from "./features.route.js"
 
 const router = Router();
 
 router.use('/layer', layerRouter)
+router.use('/feature', featureRouter)
 
 export default router;
