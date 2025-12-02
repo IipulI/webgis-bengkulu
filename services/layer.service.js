@@ -92,6 +92,7 @@ export const getLayerDetail = async (id) => {
                      SELECT json_build_object(
                                     'type', 'Feature',
                                     'id', s.id,
+                                    'name', s.name,
                                     'geometry', ST_AsGeoJSON(s.geom)::json,
                                     'properties', s.properties,
 
