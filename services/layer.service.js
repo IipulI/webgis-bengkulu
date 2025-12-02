@@ -45,12 +45,23 @@ export const getLayerDetailDashboard = async (id) => {
     }
 
     try {
-        return await Layer.findByPk(id, {
+        const result =  await Layer.findByPk(id, {
             include: {
                 model: TargetModel,
                 as: alias
             }
         })
+
+        const plainData = result.toJSON();
+
+        if (plainData[alias]) {
+            plainData.spatialItem = plainData[alias];
+            delete plainData[alias];
+        } else {
+            plainData.spatialItem = [];
+        }
+
+        return plainData;
     }
     catch (error) {
         console.error("Error fetching layer:", error);
