@@ -61,41 +61,49 @@ export const getLayerDetailDashboard = async (id) => {
 export const getLayerDetail = async (id) => {
     const layer = await Layer.findByPk(id);
     if (!layer) {
-        throw new NotFoundError("Layer tidak ditemukan")
+        throw new NotFoundError("Layer tidak ditemukan");
     }
 
     let TargetModel;
-    if (layer.geometryType === 'POINT') {
-        TargetModel = SpatialPoint;
-    }
-    else if (layer.geometryType === 'LINE') {
-        TargetModel = SpatialLine;
-    }
-    else if (layer.geometryType === 'POLYGON') {
-        TargetModel = SpatialPolygon;
-    }
-    else {
-        throw new BadRequestError("Tipe geometri layer tidak valid")
-    }
+    if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
+    else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
+    else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
+    else throw new BadRequestError("Tipe geometri layer tidak valid");
 
     try {
         const query = `
             SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'name', :layerName,
-                'features', COALESCE(json_agg(features.feature), '[]')
-            ) AS geojson
+                           'type', 'FeatureCollection',
+                           'name', :layerName,
+                           'features', COALESCE(json_agg(features.feature), '[]')
+                   ) AS geojson
             FROM (
-                SELECT json_build_object(
-                    'type', 'Feature',
-                    'id', id,
-                    'geometry', ST_AsGeoJSON(geom)::json,
-                    'properties', properties
-                ) AS feature
-                FROM ${TargetModel.tableName}
-                WHERE layer_id = :layerId
-                AND deleted_at IS NULL
-            ) features;
+                     SELECT json_build_object(
+                                    'type', 'Feature',
+                                    'id', s.id,
+                                    'geometry', ST_AsGeoJSON(s.geom)::json,
+                                    'properties', s.properties,
+
+                                    'attachments', (
+                                        SELECT COALESCE(json_agg(
+                                                                json_build_object(
+                                                                        'id', fa.id,
+                                                                        'file_url', fa.file_url,
+                                                                        'original_name', fa.original_name, -- Sertakan nama asli
+                                                                        'file_type', fa.file_type,
+                                                                        'description', fa.description
+                                                                )
+                                                        ), '[]'::json)
+                                        FROM feature_attachments fa
+                                        WHERE fa.feature_id = s.id
+                                        -- AND fa.deleted_at IS NULL -- (Aktifkan jika pakai soft delete di attachment)
+                                    )
+
+                            ) AS feature
+                     FROM ${TargetModel.tableName} s
+                     WHERE s.layer_id = :layerId
+                       AND s.deleted_at IS NULL
+                 ) features;
         `;
 
         const result = await sequelize.query(query, {
@@ -109,11 +117,11 @@ export const getLayerDetail = async (id) => {
             geojsonData.crs = layer.metadata.crs;
         }
 
-        return geojsonData
+        return geojsonData;
 
     } catch (error) {
         console.error("Error generating GeoJSON:", error);
-        return error;
+        throw error;
     }
 }
 
