@@ -3,7 +3,7 @@ import { BadRequestError, ConflictError, InternalServerError, NotFoundError } fr
 import { sequelize } from "../config/database.js";
 import { Op } from 'sequelize'
 
-const { Layer, SpatialPoint, SpatialLine, SpatialPolygon } = models;
+const { FeatureAttachment, Layer, SpatialPoint, SpatialLine, SpatialPolygon } = models;
 
 export const getLayer = async () => {
     try {
@@ -48,7 +48,12 @@ export const getLayerDetailDashboard = async (id) => {
         const result =  await Layer.findByPk(id, {
             include: {
                 model: TargetModel,
-                as: alias
+                as: alias,
+                include: {
+                    model: FeatureAttachment,
+                    as: "attachments",
+                    required: false,
+                }
             }
         })
 
