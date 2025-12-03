@@ -39,6 +39,29 @@ export default (sequelize) => {
                 type: DataTypes.GEOMETRY('MULTIPOLYGONZ', 4326),
                 allowNull: false
             },
+            yearBuilt: {
+                type: DataTypes.STRING,
+                field:"year_built"
+            },
+            regNumber: {
+                type: DataTypes.STRING,
+                field:"reg_number"
+            },
+            assetCode: {
+                type: DataTypes.STRING,
+                field:"asset_code"
+            },
+            condition: {
+                type: DataTypes.STRING,
+            },
+            managedBy: {
+                type: DataTypes.STRING,
+                field:"managed_by"
+            },
+            dataSource: {
+                type: DataTypes.STRING,
+                field:"data_source"
+            },
             createdBy: {
                 type: DataTypes.UUID,
                 field: "created_by",

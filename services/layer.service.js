@@ -98,6 +98,11 @@ export const getLayerDetail = async (id) => {
                                     'type', 'Feature',
                                     'id', s.id,
                                     'name', s.name,
+                                    'year_built', s.year_built,
+                                    'reg_number', s.reg_number,
+                                    'asset_code', s.asset_code,
+                                    'condition', s.condition,
+                                    'managed_by', s.managed_by,
                                     'geometry', ST_AsGeoJSON(s.geom)::json,
                                     'properties', s.properties,
 
