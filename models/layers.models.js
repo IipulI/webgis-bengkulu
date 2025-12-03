@@ -6,7 +6,7 @@ export default (sequelize) => {
         static associate(models) {
             this.hasMany(models.SpatialLine, {
                 foreignKey: 'layer_id',
-                as: 'spatialLines'
+                as: 'spatialLine'
             })
 
             this.hasMany(models.SpatialPoint, {
