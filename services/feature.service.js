@@ -194,13 +194,37 @@ export const updateSpatialFeatures = async(layerId, featureId, spatialData) => {
             updatePayload.geom = geomLogic;
         }
 
+        // 1. Eksekusi Update (Kirim perintah ke DB)
         await feature.update(updatePayload);
 
-        // 5. Reload data agar return value-nya fresh (terutama jika geom berubah)
-        // Opsional: Jika tidak ingin query ulang, return feature saja
-        // await feature.reload();
+        // 2. [PENTING] RELOAD DATA DARI DB
+        // Kita harus ambil ulang agar dapat koordinat hasil perhitungan PostGIS,
+        // BUKAN object fungsi 'ST_Force3D' tadi.
+        await feature.reload({
+            attributes: {
+                include: [
+                    // Kita minta PostGIS formatkan geom jadi GeoJSON string lagi
+                    [sequelize.fn('ST_AsGeoJSON', sequelize.col('geom')), 'geom']
+                ]
+            }
+        });
 
-        return feature;
+        // 3. Konversi Instance ke JSON Object Biasa
+        const responseData = feature.toJSON();
+
+        // 4. Parsing String GeoJSON menjadi Object Javascript
+        // Karena ST_AsGeoJSON mengembalikan string "{\"type\": ...}"
+        if (responseData.geom && typeof responseData.geom === 'string') {
+            responseData.geom = JSON.parse(responseData.geom);
+
+            // Tambahkan CRS agar standar
+            responseData.geom.crs = {
+                type: "name",
+                properties: { name: "EPSG:4326" }
+            };
+        }
+
+        return responseData;
     }
     catch (error){
         console.error("Update Feature Error:", error);
