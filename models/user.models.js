@@ -5,7 +5,10 @@ import bcrypt from "bcryptjs";
 export default (sequelize) => {
     class User extends Model {
         static associate(models) {
-            // define assoc here
+            this.belongsTo(models.Role, {
+                foreignKey: "role_id",
+                as: "role",
+            })
         }
     }
 

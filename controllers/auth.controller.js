@@ -1,22 +1,21 @@
-// import {authService} from "../services/auth.service.js";
-// import ResponseBuilder from "../utils/response.js";
-//
-// const handleLogin = async (req, res, next) => {
-//     try {
-//         // The names here now match our Joi schema
-//         const { username, password } = req.body;
-//         const result = await authService.login(username, password);
-//
-//         new ResponseBuilder(res)
-//             .status('success')
-//             .message('Login successful')
-//             .json(result);
-//
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-//
-// export const authController = {
-//     handleLogin,
-// }
+import {authService} from "../services/auth.service.js";
+import ResponseBuilder from "../utils/response.js";
+
+const handleLogin = async (req, res, next) => {
+    try {
+        const { username, password } = req.body;
+        const result = await authService.login(username, password);
+
+        new ResponseBuilder(res)
+            .status('success')
+            .message('Login successful')
+            .json(result);
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const authController = {
+    handleLogin,
+}
