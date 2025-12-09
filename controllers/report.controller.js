@@ -1,15 +1,17 @@
 import db from '../models/index.js'; // Pastikan path ini sesuai dengan loader Anda
 import { Op } from 'sequelize';
+import ResponseBuilder from "../utils/response.js";
+import { getPagingData } from "../utils/pagination.js";
 
 const { AssetView, Sequelize } = db;
 
-export const getAssetReport = async (req, res) => {
-    const responseBuilder = new Res
+export const getAssetReport = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
 
     try {
         const {
             page = 1,
-            limit = 10,
+            size = 10,
             search,
             category,
             subCategory,
@@ -19,7 +21,7 @@ export const getAssetReport = async (req, res) => {
             ...otherFilters // Menangkap filter dinamis (prop_...)
         } = req.query;
 
-        const offset = (page - 1) * limit;
+        const offset = (page - 1) * size;
 
         // 1. Base Condition
         let whereClause = {};
@@ -34,7 +36,7 @@ export const getAssetReport = async (req, res) => {
 
         // 3. Filter Kolom Standar
         if (condition) whereClause.condition = condition;
-        if (year_built) whereClause.year_built = year_built;
+        if (yearBuilt) whereClause.yearBuilt = yearBuilt;
         if (asset_type) whereClause.asset_type = asset_type;
         if (category) whereClause.category = category;
         if (subCategory) whereClause.subCategory = subCategory;
@@ -64,27 +66,26 @@ export const getAssetReport = async (req, res) => {
             attributes: [
                 'id', 'layerId', 'regNumber', 'name', 'layerName', 'category', 'subCategory', 'condition', 'yearBuilt', 'managedBy', 'properties', 'assetType'
             ],
-            limit: parseInt(limit),
+            size: parseInt(size),
             offset: parseInt(offset),
             order: [['created_at', 'DESC']]
         });
 
-        res.json({
-            status: 'success',
-            meta: {
-                total_data: count,
-                total_page: Math.ceil(count / limit),
-                page: parseInt(page),
-                limit: parseInt(limit)
-            },
-            data: rows
-        });
+        const data = {
+            count,
+            rows,
+            isPaginated: true,
+        }
+
+        let payload = getPagingData(data, page, size)
+
+        responseBuilder
+            .status('success')
+            .message("berhasil mengambil data")
+            .json(payload)
 
     } catch (error) {
         console.error('Error fetching asset report:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Internal Server Error'
-        });
+        next(error)
     }
 };

@@ -1,4 +1,5 @@
 import express from 'express';
+import { checkJwt } from "../middleware/jwt.middleware.js";
 import {
     getLayers,
     getLayerGeoJSON,
@@ -15,12 +16,12 @@ router.get('/', getLayers);
 router.get('/:id', getDetailLayer);
 router.get('/:id/geojson', getLayerGeoJSON);
 
-router.post('/', createLayer);
+router.post('/', checkJwt(), createLayer);
 
-router.put('/:id', updateLayer);
+router.put('/:id', checkJwt(), updateLayer);
 
-router.delete('/:id', deleteLayer);
+router.delete('/:id', checkJwt(), deleteLayer);
 
-router.patch('/:id', toggleLayerOnOff);
+router.patch('/:id', checkJwt(), toggleLayerOnOff);
 
 export default router;
