@@ -9,7 +9,7 @@ export const getLayer = async () => {
     try {
         return await Layer.findAll({
             where: { isActive: true },
-            attributes: ['id', 'name', 'geometryType', 'color', 'metadata'],
+            attributes: ['id', 'name', 'description', 'category', 'subCategory', 'geometryType', 'color', 'metadata'],
             order: [['name', 'ASC']]
         });
     } catch (error) {

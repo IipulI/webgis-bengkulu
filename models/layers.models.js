@@ -34,6 +34,13 @@ export default (sequelize) => {
             description: {
                 type: DataTypes.TEXT
             },
+            category:{
+                type: DataTypes.STRING
+            },
+            subCategory: {
+                type: DataTypes.STRING,
+                field: "sub_category"
+            },
             geometryType: {
                 type: DataTypes.STRING,
                 field: "geometry_type"
