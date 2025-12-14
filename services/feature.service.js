@@ -265,3 +265,86 @@ export const removeSpatialFeatures = async(layerId, featureId) => {
         throw new Error(error.message)
     }
 }
+
+export const getAssetsByCategory = async () => {
+    // 1. Ambil semua Layer yang aktif
+    // Kita butuh ID, Nama, Tipe Geometri, Kategori, dan Sub Kategori
+    const layers = await Layer.findAll({
+        where: { isActive: true },
+        attributes: ['id', 'name', 'geometryType', 'category', 'subCategory']
+    });
+
+    // 2. Hitung jumlah aset per layer (Parallel Processing)
+    // Kita map setiap layer menjadi Promise hitung data
+    const layerStatsPromises = layers.map(async (layer) => {
+        let TargetModel;
+
+        // Tentukan model berdasarkan geometri layer
+        if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
+        else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
+        else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
+        else return null; // Skip jika tipe aneh
+
+        // Hitung jumlah baris di tabel spasial
+        const count = await TargetModel.count({
+            where: { layerId: layer.id }
+        });
+
+        return {
+            id: layer.id,
+            name: layer.name,
+            category: layer.category || 'Uncategorized', // Handle jika kosong
+            subCategory: layer.subCategory || 'General',
+            count: count
+        };
+    });
+
+    // Tunggu semua proses hitung selesai
+    const rawStats = (await Promise.all(layerStatsPromises)).filter(item => item !== null);
+
+    // 3. Transformasi Data (Grouping Logic)
+    // Mengubah array datar menjadi struktur hierarki JSON
+    const result = [];
+
+    rawStats.forEach(item => {
+        // A. Cari apakah Kategori sudah ada di result?
+        let categoryGroup = result.find(c => c.category === item.category);
+
+        if (!categoryGroup) {
+            // Jika belum ada, buat objek Kategori baru
+            categoryGroup = {
+                category: item.category,
+                total_assets: 0,
+                sub_categories: []
+            };
+            result.push(categoryGroup);
+        }
+
+        // Tambah total aset di level Kategori
+        categoryGroup.total_assets += item.count;
+
+        // B. Cari apakah Sub-Kategori sudah ada di dalam Kategori tersebut?
+        let subGroup = categoryGroup.sub_categories.find(s => s.name === item.subCategory);
+
+        if (!subGroup) {
+            // Jika belum ada, buat objek Sub-Kategori baru
+            subGroup = {
+                name: item.subCategory,
+                total_assets: 0,
+                layers_count: 0,
+                // layers: [] // Opsional: Jika ingin list layer detailnya juga
+            };
+            categoryGroup.sub_categories.push(subGroup);
+        }
+
+        // C. Update data Sub-Kategori
+        subGroup.total_assets += item.count;
+        subGroup.layers_count += 1;
+        // subGroup.layers.push({ name: item.name, count: item.count }); // Opsional
+    });
+
+    // 4. Sorting (Opsional: Urutkan kategori abjad)
+    result.sort((a, b) => a.category.localeCompare(b.category));
+
+    return result;
+};

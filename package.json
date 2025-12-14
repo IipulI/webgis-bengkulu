@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@mapbox/shp-write": "^0.4.3",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
@@ -28,7 +29,9 @@
     "pg-hstore": "^2.3.4",
     "qrcode": "^1.5.4",
     "sequelize": "^6.29.0",
+    "shpjs": "^6.2.0",
     "slug": "^11.0.0",
+    "tokml": "^0.4.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

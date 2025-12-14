@@ -62,12 +62,35 @@ export default (sequelize) => {
                 type: DataTypes.STRING,
                 field:"data_source"
             },
+            importHash: {
+                type: DataTypes.STRING,
+                field: 'import_hash'
+            },
             createdBy: {
                 type: DataTypes.UUID,
                 field: "created_by",
             },
         },
         {
+            hooks: {
+                // Hook ini jalan OTOMATIS sebelum data disimpan (baik via create atau bulkCreate)
+                beforeSave: (instance) => {
+                    if (instance.geom) {
+                        instance.geom = sequelize.fn(
+                            'ST_Force3D',
+                            sequelize.fn(
+                                'ST_SetSRID',
+                                sequelize.fn(
+                                    'ST_Multi', // Pastikan jadi Multi
+                                    sequelize.fn('ST_GeomFromGeoJSON', JSON.stringify(instance.geom))
+                                ),
+                                4326
+                            )
+                        );
+                    }
+                }
+            },
+
             sequelize,
             underscored: true,
             timestamps: true,

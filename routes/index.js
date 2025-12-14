@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authController } from "../controllers/auth.controller.js";
 import { getAssetReport } from "../controllers/report.controller.js";
+import { formatter, getUuidList } from "../controllers/other.controller.js";
 import { validateLogin } from "../validators/auth.validator.js";
 import { checkJwt } from "../middleware/jwt.middleware.js";
 // import { attachCurrentUser } from "../middleware/attach-user.middleware.js";
@@ -18,5 +19,10 @@ router.get('/report', checkJwt(), getAssetReport)
 router.use('/layer', layerRouter)
 router.use('/feature', checkJwt(), featureRouter)
 router.use('/attachment', checkJwt(), attachmentRoutes);
+
+
+// for dev tool
+router.get('/utils//formatter', formatter)
+router.get('/utils/uuid-generate', getUuidList)
 
 export default router;
