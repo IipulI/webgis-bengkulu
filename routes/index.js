@@ -10,15 +10,15 @@ import { checkJwt } from "../middleware/jwt.middleware.js";
 import layerRouter from "./layers.route.js"
 import featureRouter from "./features.route.js"
 import attachmentRoutes from "./attachment.route.js"
-import { getCategoryReport, getSubCategoryReport } from "../services/report.service.js";
+import { getCategoryReport, getSubCategoryReport } from "../controllers/report.controller.js"
 
 const router = Router();
 
 router.post('/auth/login', validateLogin, authController.handleLogin)
 router.get('/report', checkJwt(), getAssetReport)
 
-router.get('/category', checkJwt(), getCategoryReport)
-router.get('/sub-category', checkJwt(), getSubCategoryReport)
+router.get('/category', getCategoryReport)
+router.get('/sub-category', getSubCategoryReport)
 
 router.use('/layer', layerRouter)
 router.use('/feature', checkJwt(), featureRouter)
