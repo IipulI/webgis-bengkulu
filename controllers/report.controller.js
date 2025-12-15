@@ -80,3 +80,128 @@ export const getAssetReport = async (req, res, next) => {
         next(error)
     }
 };
+
+export const getCategoryReport = async (req, res, next) => {
+    const responseBuilder = new ResponseBuilder(res)
+
+    const data = [
+        {
+            name: "Bangungan Gedung",
+            value: "bangunan-gedung"
+        },
+        {
+            name: "Jaringan Jalan dan Jembatan",
+            value: "jaringan-jalan-dan-jembatan"
+        },
+        {
+            name: "Drainase Perkotaan dan Pengendalian Banjir",
+            value: "drainase-perkotaan-dan-pengendalian-banjir"
+        },
+        {
+            name: "Bangunan Sumber Daya Air dan Irigasi",
+            value: "bangunan-sumber-daya-air-dan-irigasi"
+        },
+        {
+            name: "Jaringan Air Minum",
+            value: "jaringan-air-minum"
+        },
+        {
+            name: "Pengolahaan Air Limbah dan Limbah B3 dan Sanitasi",
+            value: "pengolahaan-air-limbah-dan-limbah-b3-dan-sanitasi"
+        }
+    ]
+
+    return responseBuilder
+        .status('success')
+        .message("berhasil mengambil kategori")
+        .json(data)
+}
+
+export const getSubCategoryReport = async (req, res, next) => {
+    const category = req.query.category;
+    const responseBuilder = new ResponseBuilder(res)
+
+    let data
+    switch (category) {
+        case 'bangunan-gedung':
+            data = [
+                {
+                    name: "bangunan-gedung",
+                    value: "bangunan-gedung"
+                }
+            ]
+            break;
+        case 'jaringan-jalan-dan-jembatan':
+            data = [
+                {
+                    name: "Jaringan",
+                    value: "jarignan"
+                },
+                {
+                    name: "Jalan",
+                    value: "jalan"
+                },
+                {
+                    name: "Jembatan",
+                    value: "jembatan"
+                }
+            ]
+            break;
+        case "drainase-perkotaan-dan-pengendalian-banjir":
+            data = [
+                {
+                    name: "Drainase Perkotaan",
+                    value: "drainase-perkotaan"
+                },
+                {
+                    name: "Pengendalian Banjir",
+                    value: "pengendalian-banjir"
+                }
+            ]
+            break;
+        case "bangunan-sumber-daya-air-dan-irigasi":
+            data = [
+                {
+                    name: "Bangunan Sumber Daya Air",
+                    value: "bangunan-sumber-daya-air"
+                },
+                {
+                    name: "Irigasi",
+                    value: "irigasi"
+                }
+            ]
+            break;
+        case "jaringan-air-minum":
+            data = [
+                {
+                    name: "Jaringan Air Minum",
+                    value: "jaringan-air-minum"
+                }
+            ]
+            break;
+        case "pengolahaan-air-limbah-dan-limbah-b3-dan-sanitasi":
+            data = [
+                {
+                    name: "Pengendalian Air Limbah",
+                    value: "pengendalian-air-limbah"
+                },
+                {
+                    name: "Pengendalian Limbah B3",
+                    value: "limbah-b3-dan-limbah"
+                },
+                {
+                    name: "Sanitasi",
+                    value: "sanitasi"
+                }
+            ]
+            break;
+        default:
+            data = []
+            break;
+    }
+
+    responseBuilder
+        .status('success')
+        .message("berhasil mengambil sub kategori")
+        .json(data)
+}
