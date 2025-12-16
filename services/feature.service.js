@@ -266,85 +266,125 @@ export const removeSpatialFeatures = async(layerId, featureId) => {
     }
 }
 
+const FIXED_TAXONOMY = [
+    {
+        name: "Bangunan Gedung",
+        slug: "bangunan-gedung",
+        subs: [
+            { name: "Bangunan Gedung", slug: "bangunan-gedung" }
+        ]
+    },
+    {
+        name: "Jaringan Jalan dan Jembatan",
+        slug: "jaringan-jalan-dan-jembatan",
+        subs: [
+            { name: "Jaringan", slug: "jaringan" },
+            { name: "Jalan", slug: "jalan" },
+            { name: "Jembatan", slug: "jembatan" }
+        ]
+    },
+    {
+        name: "Drainase Perkotaan dan Pengendalian Banjir",
+        slug: "drainase-perkotaan-dan-pengendalian-banjir",
+        subs: [
+            { name: "Drainase Perkotaan", slug: "drainase-perkotaan" },
+            { name: "Pengendalian Banjir", slug: "pengendalian-banjir" }
+        ]
+    },
+    {
+        name: "Bangunan Sumber Daya Air dan Irigasi",
+        slug: "bangunan-sumber-daya-air-dan-irigasi",
+        subs: [
+            { name: "Bangunan Sumber Daya Air", slug: "bangunan-sumber-daya-air" },
+            { name: "Irigasi", slug: "irigasi" }
+        ]
+    },
+    {
+        name: "Jaringan Air Minum",
+        slug: "jaringan-air-minum",
+        subs: [
+            { name: "Jaringan Air Minum", slug: "jaringan-air-minum" }
+        ]
+    },
+    {
+        name: "Pengolahaan Air Limbah dan Limbah B3 dan Sanitasi",
+        slug: "pengolahaan-air-limbah-dan-limbah-b3-dan-sanitasi",
+        subs: [
+            { name: "Pengendalian Air Limbah", slug: "pengendalian-air-limbah" },
+            { name: "Pengendalian Limbah B3", slug: "pengendalian-limbah-b3" },
+            { name: "Sanitasi", slug: "sanitasi" }
+        ]
+    }
+];
+
 export const getAssetsByCategory = async () => {
-    // 1. Ambil semua Layer yang aktif
-    // Kita butuh ID, Nama, Tipe Geometri, Kategori, dan Sub Kategori
+    // --- STEP 2: BUILD SKELETON ---
+    const result = FIXED_TAXONOMY.map(template => ({
+        category: template.name,
+        _db_slug: template.slug,
+        total_assets: 0,
+        sub_categories: template.subs.map(sub => ({
+            name: sub.name,
+            _db_slug: sub.slug,
+            total_assets: 0,
+            layers_count: 0
+        }))
+    }));
+
+    // --- STEP 3: FETCH DATA FROM DB ---
     const layers = await Layer.findAll({
         where: { isActive: true },
-        attributes: ['id', 'name', 'geometryType', 'category', 'subCategory']
+        attributes: ['id', 'geometryType', 'category', 'subCategory']
     });
 
-    // 2. Hitung jumlah aset per layer (Parallel Processing)
-    // Kita map setiap layer menjadi Promise hitung data
     const layerStatsPromises = layers.map(async (layer) => {
         let TargetModel;
-
-        // Tentukan model berdasarkan geometri layer
         if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
         else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
         else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
-        else return null; // Skip jika tipe aneh
+        else return null;
 
-        // Hitung jumlah baris di tabel spasial
-        const count = await TargetModel.count({
-            where: { layerId: layer.id }
-        });
+        const count = await TargetModel.count({ where: { layerId: layer.id } });
 
         return {
-            id: layer.id,
-            name: layer.name,
-            category: layer.category || 'Uncategorized', // Handle jika kosong
-            subCategory: layer.subCategory || 'General',
+            category: layer.category ? layer.category.toLowerCase().trim() : '',
+            subCategory: layer.subCategory ? layer.subCategory.toLowerCase().trim() : '',
             count: count
         };
     });
 
-    // Tunggu semua proses hitung selesai
     const rawStats = (await Promise.all(layerStatsPromises)).filter(item => item !== null);
 
-    // 3. Transformasi Data (Grouping Logic)
-    // Mengubah array datar menjadi struktur hierarki JSON
-    const result = [];
+    // --- STEP 4: FILL DATA (MATCHING BY SLUG) ---
+    rawStats.forEach(stat => {
+        const targetCategory = result.find(r => r._db_slug === stat.category);
 
-    rawStats.forEach(item => {
-        // A. Cari apakah Kategori sudah ada di result?
-        let categoryGroup = result.find(c => c.category === item.category);
+        if (targetCategory) {
+            const targetSub = targetCategory.sub_categories.find(s => s._db_slug === stat.subCategory);
 
-        if (!categoryGroup) {
-            // Jika belum ada, buat objek Kategori baru
-            categoryGroup = {
-                category: item.category,
-                total_assets: 0,
-                sub_categories: []
-            };
-            result.push(categoryGroup);
+            if (targetSub) {
+                targetSub.total_assets += stat.count;
+                targetSub.layers_count += 1;
+                targetCategory.total_assets += stat.count;
+            }
         }
-
-        // Tambah total aset di level Kategori
-        categoryGroup.total_assets += item.count;
-
-        // B. Cari apakah Sub-Kategori sudah ada di dalam Kategori tersebut?
-        let subGroup = categoryGroup.sub_categories.find(s => s.name === item.subCategory);
-
-        if (!subGroup) {
-            // Jika belum ada, buat objek Sub-Kategori baru
-            subGroup = {
-                name: item.subCategory,
-                total_assets: 0,
-                layers_count: 0,
-                // layers: [] // Opsional: Jika ingin list layer detailnya juga
-            };
-            categoryGroup.sub_categories.push(subGroup);
-        }
-
-        // C. Update data Sub-Kategori
-        subGroup.total_assets += item.count;
-        subGroup.layers_count += 1;
-        // subGroup.layers.push({ name: item.name, count: item.count }); // Opsional
     });
 
-    // 4. Sorting (Opsional: Urutkan kategori abjad)
-    result.sort((a, b) => a.category.localeCompare(b.category));
+    // --- STEP 5: FINAL CLEANUP & FORMATTING ---
+    // Di sini kita mapping ulang agar properti 'slug' masuk ke output final
+    const finalResult = result.map(cat => {
+        return {
+            category: cat.category,
+            slug: cat._db_slug, // <--- UPDATE: Masukkan Slug Kategori ke Response
+            total_assets: cat.total_assets,
+            sub_categories: cat.sub_categories.map(sub => ({
+                name: sub.name,
+                slug: sub._db_slug, // <--- UPDATE: Masukkan Slug Sub-Kategori ke Response
+                total_assets: sub.total_assets,
+                layers_count: sub.layers_count
+            }))
+        };
+    });
 
-    return result;
+    return finalResult;
 };

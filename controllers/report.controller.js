@@ -126,7 +126,7 @@ export const getSubCategoryReport = async (req, res, next) => {
         case 'bangunan-gedung':
             data = [
                 {
-                    name: "bangunan-gedung",
+                    name: "Bangunan Gedung",
                     value: "bangunan-gedung"
                 }
             ]
