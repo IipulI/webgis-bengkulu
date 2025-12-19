@@ -2,6 +2,7 @@ import models from '../models/index.js'
 import { BadRequestError, ConflictError, InternalServerError, NotFoundError } from "../utils/custom-error.js";
 import { sequelize } from "../config/database.js";
 import { Op } from 'sequelize'
+import { getPagination } from "../utils/pagination.js";
 
 const { FeatureAttachment, Layer, SpatialPoint, SpatialLine, SpatialPolygon } = models;
 
@@ -18,7 +19,10 @@ export const getLayer = async () => {
     }
 }
 
-export const getLayerDetailDashboard = async (id) => {
+export const getLayerDetailDashboard = async (id, page, size) => {
+    const isPaginated = page != null && size != null;
+    const { limit, offset } = getPagination(page, size);
+
     const layer = await Layer.findByPk(id, {
         attributes: ['id', 'geometryType'],
     });
@@ -44,20 +48,28 @@ export const getLayerDetailDashboard = async (id) => {
         throw new BadRequestError("Tipe geometri layer tidak valid")
     }
 
-    try {
-        const result =  await Layer.findByPk(id, {
+    let queryBuilder = {
+        include: {
+            model: TargetModel,
+            as: alias,
             include: {
-                model: TargetModel,
-                as: alias,
-                include: {
-                    model: FeatureAttachment,
-                    as: "attachments",
-                    required: false,
-                }
+                model: FeatureAttachment,
+                as: "attachments",
+                required: false,
             }
-        })
+        }
+    }
 
-        const plainData = result.toJSON();
+    try {
+        if (isPaginated) {
+            const { limit, offset } = getPagination(page, size);
+            queryBuilder.limit = limit;
+            queryBuilder.offset = offset;
+        }
+
+        const { count, rows } =  await Layer.findByPk(id, queryBuilder)
+
+        const plainData = rows.toJSON();
 
         if (plainData[alias]) {
             plainData.spatialItem = plainData[alias];
@@ -66,7 +78,11 @@ export const getLayerDetailDashboard = async (id) => {
             plainData.spatialItem = [];
         }
 
-        return plainData;
+        return {
+            count: count,
+            rows: plainData,
+            isPaginated: isPaginated
+        }
     }
     catch (error) {
         console.error("Error fetching layer:", error);

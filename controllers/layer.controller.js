@@ -1,6 +1,7 @@
 import db from "../models/index.js";
 import ResponseBuilder from "../utils/response.js";
 import * as layerService from '../services/layer.service.js'
+import { getPagingData } from "../utils/pagination.js";
 
 export const getLayers = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res);
@@ -21,16 +22,25 @@ export const getLayers = async (req, res, next) => {
 
 export const getDetailLayer = async (req, res, next) => {
     const { id } = req.params;
+    const page = req.query.page ? parseInt(req.query.page) : null;
+    const size = req.query.size ? parseInt(req.query.size) : null;
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const data = await layerService.getLayerDetailDashboard(id)
+        const data = await layerService.getLayerDetailDashboard(id, page, size)
+
+        let payload
+        if (data.isPaginated === true){
+            payload = getPagingData(data, page, size)
+        } else {
+            payload = data.rows;
+        }
 
         responseBuilder
             .status('success')
             .code(200)
             .message("berhasil mengambil data")
-            .json(data)
+            .json(payload)
     }
     catch (error) {
         next(error);
