@@ -70,8 +70,10 @@ class ResponseBuilder {
    * @param {object | Array | null} data - The data payload.
    */
   _buildSuccessBody(responseBody, data) {
-    if (data && typeof data.total === "number" && Array.isArray(data.items)) {
+    if (data && typeof data.total === "number" && data.items) {
+
       responseBody.data = data.items;
+
       responseBody.pagination = {
         currentPage: data.currentPage,
         perPage: data.perPage,

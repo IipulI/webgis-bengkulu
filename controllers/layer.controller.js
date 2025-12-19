@@ -29,11 +29,15 @@ export const getDetailLayer = async (req, res, next) => {
     try {
         const data = await layerService.getLayerDetailDashboard(id, page, size)
 
-        let payload
-        if (data.isPaginated === true){
-            payload = getPagingData(data, page, size)
+        let payload;
+        if (data.isPaginated) {
+            payload = getPagingData(data, page, size);
+
+            if (Array.isArray(payload.items) && payload.items.length > 0) {
+                payload.items = payload.items[0];
+            }
         } else {
-            payload = data.rows;
+            payload = data.rows[0];
         }
 
         responseBuilder

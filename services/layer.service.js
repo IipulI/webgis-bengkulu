@@ -23,70 +23,44 @@ export const getLayerDetailDashboard = async (id, page, size) => {
     const isPaginated = page != null && size != null;
     const { limit, offset } = getPagination(page, size);
 
-    const layer = await Layer.findByPk(id, {
-        attributes: ['id', 'geometryType'],
-    });
-    if (!layer) {
-        throw new NotFoundError("Layer tidak ditemukan")
-    }
+    try {
+        const layer = await Layer.findByPk(id);
+        if (!layer) {
+            throw new NotFoundError("Layer tidak ditemukan");
+        }
 
-    let TargetModel;
-    let alias;
-    if (layer.geometryType === 'POINT') {
-        TargetModel = SpatialPoint;
-        alias = "spatialPoint";
-    }
-    else if (layer.geometryType === 'LINE') {
-        TargetModel = SpatialLine;
-        alias = "spatialLine";
-    }
-    else if (layer.geometryType === 'POLYGON') {
-        TargetModel = SpatialPolygon;
-        alias = "spatialPolygon";
-    }
-    else {
-        throw new BadRequestError("Tipe geometri layer tidak valid")
-    }
+        let TargetModel;
+        if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
+        else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
+        else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
+        else throw new BadRequestError("Tipe geometri layer tidak valid");
 
-    let queryBuilder = {
-        include: {
-            model: TargetModel,
-            as: alias,
-            include: {
+        const itemQuery = {
+            where: { layerId: id },
+            include: [{
                 model: FeatureAttachment,
                 as: "attachments",
                 required: false,
-            }
-        }
-    }
+            }],
+            limit: isPaginated ? limit : undefined,
+            offset: isPaginated ? offset : undefined,
+            order: [['createdAt', 'DESC']]
+        };
 
-    try {
-        if (isPaginated) {
-            const { limit, offset } = getPagination(page, size);
-            queryBuilder.limit = limit;
-            queryBuilder.offset = offset;
-        }
+        const { count, rows: itemRows } = await TargetModel.findAndCountAll(itemQuery);
 
-        const { count, rows } =  await Layer.findByPk(id, queryBuilder)
-
-        const plainData = rows.toJSON();
-
-        if (plainData[alias]) {
-            plainData.spatialItem = plainData[alias];
-            delete plainData[alias];
-        } else {
-            plainData.spatialItem = [];
-        }
+        const layerData = layer.toJSON();
+        layerData.spatialItem = itemRows;
 
         return {
             count: count,
-            rows: plainData,
+            rows: [layerData],
             isPaginated: isPaginated
-        }
-    }
-    catch (error) {
-        console.error("Error fetching layer:", error);
-        return error
+        };
+
+    } catch (error) {
+        console.error("Error fetching layer details:", error);
+        throw error;
     }
 }
 
