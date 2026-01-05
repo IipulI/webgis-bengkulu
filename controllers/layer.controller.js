@@ -1,4 +1,3 @@
-import db from "../models/index.js";
 import ResponseBuilder from "../utils/response.js";
 import * as layerService from '../services/layer.service.js'
 import { getPagingData } from "../utils/pagination.js";
@@ -53,9 +52,12 @@ export const getDetailLayer = async (req, res, next) => {
 
 export const getLayerGeoJSON = async (req, res, next) => {
     const { id } = req.params;
+    const user  = req.user;
+
+    const isPublicUser = !user;
 
     try {
-        const data = await layerService.getLayerDetail(id)
+        const data = await layerService.getLayerDetail(id, isPublicUser)
 
         return res.json(data)
     }

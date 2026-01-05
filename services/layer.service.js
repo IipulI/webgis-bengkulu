@@ -4,7 +4,7 @@ import { sequelize } from "../config/database.js";
 import { Op } from 'sequelize'
 import { getPagination } from "../utils/pagination.js";
 
-const { FeatureAttachment, Layer, SpatialPoint, SpatialLine, SpatialPolygon } = models;
+const { FeatureAttachment, Layer, LayerSchema, SpatialPoint, SpatialLine, SpatialPolygon } = models;
 
 export const getLayer = async () => {
     try {
@@ -23,18 +23,18 @@ export const getLayerDetailDashboard = async (id, page, size) => {
     const isPaginated = page != null && size != null;
     const { limit, offset } = getPagination(page, size);
 
+    const layer = await Layer.findByPk(id);
+    if (!layer) {
+        throw new NotFoundError("Layer tidak ditemukan");
+    }
+
+    let TargetModel;
+    if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
+    else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
+    else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
+    else throw new BadRequestError("Tipe geometri layer tidak valid");
+
     try {
-        const layer = await Layer.findByPk(id);
-        if (!layer) {
-            throw new NotFoundError("Layer tidak ditemukan");
-        }
-
-        let TargetModel;
-        if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
-        else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
-        else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
-        else throw new BadRequestError("Tipe geometri layer tidak valid");
-
         const itemQuery = {
             where: { layerId: id },
             include: [{
@@ -64,10 +64,25 @@ export const getLayerDetailDashboard = async (id, page, size) => {
     }
 }
 
-export const getLayerDetail = async (id) => {
+export const getLayerDetail = async (id, isPublicUser = false) => {
     const layer = await Layer.findByPk(id);
     if (!layer) {
         throw new NotFoundError("Layer tidak ditemukan");
+    }
+
+    const schema = await LayerSchema.findOne({
+        where: { subCategory: layer.subCategory }
+    });
+
+    let visibleSchema = [];
+    if (schema && schema.definition) {
+        visibleSchema = schema.definition.filter(rule => {
+            // Jika user Public DAN atribut ini diset private -> HIDE
+            if (isPublicUser && rule.is_visible_public === false) {
+                return false;
+            }
+            return true;
+        });
     }
 
     let TargetModel;
@@ -78,64 +93,109 @@ export const getLayerDetail = async (id) => {
 
     try {
         const query = `
-            SELECT json_build_object(
-                           'type', 'FeatureCollection',
-                           'name', :layerName,
-                           'features', COALESCE(json_agg(features.feature), '[]')
-                   ) AS geojson
-            FROM (
-                     SELECT json_build_object(
-                                    'type', 'Feature',
-                                    'id', s.id,
-                                    'name', s.name,
-                                    'year_built', s.year_built,
-                                    'reg_number', s.reg_number,
-                                    'asset_code', s.asset_code,
-                                    'condition', s.condition,
-                                    'managed_by', s.managed_by,
-                                    'geometry', ST_AsGeoJSON(s.geom)::json,
-                                    'properties', s.properties,
+            SELECT 
+                s.id,
+                s.name,
+                -- Ambil Kolom Fisik (Hardcoded Columns)
+                s.year_built,
+                s.reg_number,
+                s.asset_code,
+                s.condition,
+                s.managed_by,
+                
+                -- Ambil JSONB Properties (Kita rename jadi json_props biar jelas)
+                s.properties as json_props,
+                
+                -- Ambil Geometri sebagai JSON
+                ST_AsGeoJSON(s.geom)::json as geometry,
 
-                                    'attachments', (
-                                        SELECT COALESCE(json_agg(
-                                                                json_build_object(
-                                                                        'id', fa.id,
-                                                                        'file_url', fa.file_url,
-                                                                        'original_name', fa.original_name, -- Sertakan nama asli
-                                                                        'file_type', fa.file_type,
-                                                                        'description', fa.description
-                                                                )
-                                                        ), '[]'::json)
-                                        FROM feature_attachments fa
-                                        WHERE fa.feature_id = s.id
-                                        -- AND fa.deleted_at IS NULL -- (Aktifkan jika pakai soft delete di attachment)
-                                    )
+                -- Subquery untuk Attachments (Tetap di SQL biar performa tinggi)
+                (
+                    SELECT COALESCE(json_agg(
+                        json_build_object(
+                            'id', fa.id,
+                            'file_url', fa.file_url,
+                            'original_name', fa.original_name,
+                            'file_type', fa.file_type,
+                            'description', fa.description
+                        )
+                    ), '[]'::json)
+                    FROM feature_attachments fa
+                    WHERE fa.feature_id = s.id
+                    AND fa.deleted_at IS NULL
+                ) as attachments
 
-                            ) AS feature
-                     FROM ${TargetModel.tableName} s
-                     WHERE s.layer_id = :layerId
-                       AND s.deleted_at IS NULL
-                 ) features;
+            FROM ${TargetModel.tableName} s
+            WHERE s.layer_id = :layerId
+              AND s.deleted_at IS NULL
         `;
 
-        const result = await sequelize.query(query, {
-            replacements: { layerId: id, layerName: layer.name },
+        const rawFeatures = await sequelize.query(query, {
+            replacements: { layerId: id },
             type: sequelize.QueryTypes.SELECT
         });
 
-        const geojsonData = result[0].geojson;
+        const processedFeatures = rawFeatures.map(row => {
+            const finalProperties = {};
+
+            if (schema && schema.definition) {
+                schema.definition.forEach(rule => {
+                    if (isPublicUser && rule.is_visible_public === false) {
+                        return;
+                    }
+
+                    // Ambil Datanya (Cari di Kolom Fisik dulu, baru di JSONB)
+                    let value = null;
+
+                    // 1. Cek di kolom fisik tabel (row.year_built, row.condition, dll)
+                    if (row[rule.key] !== undefined) {
+                        value = row[rule.key];
+                    }
+                    // 2. Cek di dalam JSONB (row.json_props.luas, dll)
+                    else if (row.json_props && row.json_props[rule.key] !== undefined) {
+                        value = row.json_props[rule.key];
+                    }
+
+                    finalProperties[rule.key] = value;
+                });
+            }
+            else {
+                finalProperties.year_built = row.year_built;
+                finalProperties.reg_number = row.reg_number;
+                finalProperties.asset_code = row.asset_code;
+                finalProperties.condition = row.condition;
+                finalProperties.managed_by = row.managed_by;
+                Object.assign(finalProperties, row.json_props);
+            }
+
+            return {
+                type: "Feature",
+                id: row.id,
+                name: row.name,
+                geometry: row.geometry,
+                properties: finalProperties,
+                attachments: row.attachments
+            };
+        });
+
+        const geoJsonResult = {
+            type: "FeatureCollection",
+            name: layer.name,
+            features: processedFeatures,
+            schema: visibleSchema
+        };
 
         if (layer.metadata && layer.metadata.crs) {
-            geojsonData.crs = layer.metadata.crs;
+            geoJsonResult.crs = layer.metadata.crs;
         }
 
-        return geojsonData;
+        return geoJsonResult;
 
     } catch (error) {
         console.error("Error generating GeoJSON:", error);
         throw error;
     }
-}
+};
 
 export const createNewLayer = async(layerData) => {
     const existingLayer = await Layer.findOne({
@@ -210,7 +270,7 @@ export const toggleLayer = async (layerId) => {
             return await layer.update({isActive: true})
         }
         else {
-            throw new InternalServerError()
+            new InternalServerError()
         }
     }
     catch (error) {

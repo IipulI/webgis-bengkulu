@@ -10,6 +10,7 @@ import { checkJwt } from "../middleware/jwt.middleware.js";
 import layerRouter from "./layers.route.js"
 import featureRouter from "./features.route.js"
 import attachmentRoutes from "./attachment.route.js"
+import layerSchemaRoute from "./layer-schema.route.js";
 import { getCategoryReport, getSubCategoryReport } from "../controllers/report.controller.js"
 
 const router = Router();
@@ -23,6 +24,7 @@ router.get('/sub-category', getSubCategoryReport)
 router.use('/layer', layerRouter)
 router.use('/feature', checkJwt(), featureRouter)
 router.use('/attachment', checkJwt(), attachmentRoutes);
+router.use('/layer-schema', layerSchemaRoute)
 
 
 // for dev tool
