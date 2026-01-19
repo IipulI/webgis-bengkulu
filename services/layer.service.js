@@ -96,20 +96,15 @@ export const getLayerDetail = async (id, isPublicUser = false) => {
             SELECT 
                 s.id,
                 s.name,
-                -- Ambil Kolom Fisik (Hardcoded Columns)
                 s.year_built,
                 s.reg_number,
                 s.asset_code,
                 s.condition,
                 s.managed_by,
                 
-                -- Ambil JSONB Properties (Kita rename jadi json_props biar jelas)
                 s.properties as json_props,
                 
-                -- Ambil Geometri sebagai JSON
                 ST_AsGeoJSON(s.geom)::json as geometry,
-
-                -- Subquery untuk Attachments (Tetap di SQL biar performa tinggi)
                 (
                     SELECT COALESCE(json_agg(
                         json_build_object(

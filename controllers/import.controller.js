@@ -3,7 +3,7 @@ import { BadRequestError } from '../utils/custom-error.js';
 
 export const importLayerData = async (req, res, next) => {
     try {
-        const { layerId } = req.params;
+        const { id } = req.params;
 
         // Ambil file dari req.files (karena middleware Anda pakai .fields())
         const files = req.files['file'];
@@ -15,7 +15,7 @@ export const importLayerData = async (req, res, next) => {
         const file = files[0];
 
         // Panggil Service
-        const result = await importService.importShapefileBulk(layerId, file.path);
+        const result = await importService.importShapefileBulk(id, file.path);
 
         res.status(200).json({
             status: 'success',

@@ -1,156 +1,137 @@
-import fs from 'fs/promises';
-import shp from 'shpjs';
+import { promises as fs } from 'fs';
 import crypto from 'crypto';
-import path from 'path';
+import shp from 'shpjs';
+import _ from 'lodash';
 import db from "../models/index.js";
 import { BadRequestError, NotFoundError } from '../utils/custom-error.js';
-import { mapGeoJSONTypeToLayerType } from "../utils/geojson-type.js";
 
-const { Layer, SpatialPoint, SpatialLine, SpatialPolygon, sequelize } = db;
+const { Layer, LayerSchema, SpatialPoint, SpatialLine, SpatialPolygon, sequelize } = db;
 
 export const importShapefileBulk = async (layerId, filePath) => {
-    // 1. Cek Layer & Tentukan Model Target
+    // 1. SETUP: Cek Layer & Schema
     const layer = await Layer.findByPk(layerId);
-    if (!layer) throw new NotFoundError("Layer tidak ditemukan");
+    if (!layer) throw new Error("Layer tidak ditemukan"); // Gunakan standard Error atau Custom Error Anda
+
+    const schema = await LayerSchema.findOne({ where: { sub_category: layer.subCategory } }); // Perhatikan penulisan sub_category (snake_case di DB?)
+    if (!schema) throw new Error(`Schema untuk kategori ${layer.subCategory} belum dibuat.`);
 
     let TargetModel;
+    // Pastikan mapping model sesuai
     if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
     else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
     else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
 
+    const transaction = await sequelize.transaction();
+
     try {
-        // 2. Baca File ZIP
+        // 2. Baca & Parse SHP
         const buffer = await fs.readFile(filePath);
         let geojson = await shp(buffer);
-
-        // Handle jika di dalam zip ada folder (shpjs return array)
         if (Array.isArray(geojson)) geojson = geojson[0];
 
         if (!geojson.features || geojson.features.length === 0) {
-            throw new BadRequestError("File Shapefile kosong atau tidak valid.");
+            throw new Error("File Shapefile kosong.");
         }
 
-        const entriesToInsert = []; // Antrian Barang Baru / Tanpa ID
-        const entriesToUpdate = []; // Antrian Barang Revisi / Punya ID
+        // 3. MAPPING LOOP
+        const toInsert = [];
+        const candidatesForUpdate = [];
+        const candidateIds = [];
 
-        // 3. Mapping Loop
         for (const feature of geojson.features) {
-            const props = feature.properties || {};
+            // A. Mapping Row (PASSING LAYER OBJECT UNTUK CEK GEOMETRY TYPE)
+            const mappedRow = mapFeatureToRow(feature, schema, layer, layerId);
 
-            // A. Normalisasi Atribut (Mapping Cerdas)
-            // Mapping Kondisi
-            let condition = 'Baik';
-            const remark = props.REMARK || props.remark || '';
-            if (remark && typeof remark === 'string' && remark.toLowerCase().includes('rusak')) {
-                condition = 'Rusak';
-            } else if (props.KONDISI) {
-                condition = props.KONDISI;
+            // Validasi: Jika geometri rusak/tidak sesuai tipe, mapFeatureToRow akan return null atau geom null
+            if (!mappedRow || !mappedRow.geom) {
+                console.warn("Skipping feature due to invalid geometry");
+                continue;
             }
 
-            // Mapping Kode Aset & Tahun
-            const assetCode = props.JNSRSR || props.ORDE01 || props.ORDE02 || props.CODE || null;
-            const year = props.TAHUN || props.YEAR || props.year_built || null;
-            const regNum = props.NOREG || props.reg_number || null;
-            const source = props.SBDATA || props.data_source || 'Import SHP';
-            const owner = props.WADMPR || props.WADMKK || props.managed_by || 'Pemkot';
-
-            // Nama Objek
-            const name = props.NAMOBJ || props.Name || props.NAME || 'Imported Feature';
-
-            // B. Generate Digital Fingerprint (Hash)
-            // Hash = LayerID + String Geometry.
-            // Jika koordinat geser 0.00001 saja, hash berubah -> dianggap baru.
-            const uniqueString = `${layerId}_${JSON.stringify(feature.geometry)}`;
-            const hash = crypto.createHash('md5').update(uniqueString).digest('hex');
-
-            // C. Cek System ID (Round-Trip Strategy)
-            // SHP memotong nama kolom jadi 10 char, jadi cek variasi-nya
-            const systemId = props.system_id || props.SYSTEM_ID || props.uuid || props.UUID;
-
-            const payload = {
-                layerId,
-                name,
-
-                // Kolom Fisik (Promoted Columns)
-                yearBuilt: year ? parseInt(year) : null,
-                regNumber: regNum,
-                assetCode: assetCode ? String(assetCode) : null,
-                condition,
-                managedBy: owner,
-                dataSource: source,
-
-                importHash: hash, // Simpan Hash
-
-                properties: props, // Simpan semua raw data di JSONB
-                geom: feature.geometry // GeoJSON Mentah (Hook Model yg akan handle ST_Multi)
-            };
+            // B. Cek System ID untuk Update
+            const props = feature.properties;
+            const systemId = props.systemId || props.system_id || props.uuid || props.SYS_ID || props.SYSTEM_ID;
 
             if (systemId) {
-                // JALUR 1: UPDATE (Punya KTP/ID)
-                payload.id = systemId;
-                entriesToUpdate.push(payload);
+                mappedRow.id = systemId;
+                candidatesForUpdate.push(mappedRow);
+                candidateIds.push(systemId);
             } else {
-                // JALUR 2: INSERT / UPSERT (Tanpa ID)
-                entriesToInsert.push(payload);
+                toInsert.push(mappedRow);
             }
         }
 
-        // 4. Eksekusi Database
+        // 4. DIRTY CHECKING (Optimasi Update)
+        const finalUpdates = [];
+
+        if (candidatesForUpdate.length > 0) {
+            // Kolom fisik untuk compare. Pastikan sesuai definisi model.
+            const compareAttrs = ['id', 'geom', 'properties', 'importHash', 'name', 'yearBuilt', 'condition'];
+
+            const existingRows = await TargetModel.findAll({
+                where: { id: candidateIds },
+                attributes: compareAttrs
+            });
+
+            const existingMap = new Map(existingRows.map(row => [row.id, row]));
+
+            candidatesForUpdate.forEach(newData => {
+                const oldData = existingMap.get(newData.id);
+
+                if (!oldData) {
+                    // ID ada di SHP tapi tidak di DB -> Insert baru (Restore/Migrasi)
+                    toInsert.push(newData);
+                } else {
+                    if (isDataChanged(newData, oldData)) {
+                        finalUpdates.push(newData);
+                    }
+                }
+            });
+        }
+
+        // 5. EKSEKUSI DATABASE
         let insertedCount = 0;
         let updatedCount = 0;
 
-        // A. Batch Insert (dengan Logic Anti-Duplikat Hash)
-        if (entriesToInsert.length > 0) {
-            await TargetModel.bulkCreate(entriesToInsert, {
+        // A. Insert
+        if (toInsert.length > 0) {
+            await TargetModel.bulkCreate(toInsert, {
+                transaction,
                 validate: true,
-                hooks: true, // Wajib TRUE agar ST_Multi/ST_Force3D jalan
-
-                // ON CONFLICT (layer_id, import_hash) DO UPDATE ...
-                updateOnDuplicate: ['name', 'properties', 'condition', 'yearBuilt', 'updatedAt'],
-                conflictAttributes: ['layer_id', 'import_hash']
+                individualHooks: true // Wajib true agar PostGIS memproses geometri GeoJSON -> Geometry
             });
-            insertedCount = entriesToInsert.length;
+            insertedCount = toInsert.length;
         }
 
-        // B. Batch Update (Looping karena update bulk by ID susah di Sequelize)
-        // Kita pakai Promise.all agar parallel dan cepat
-        if (entriesToUpdate.length > 0) {
-            const updatePromises = entriesToUpdate.map(item => {
-                return TargetModel.update({
-                    name: item.name,
-                    geom: sequelize.fn(
-                        'ST_Force3D',
-                        sequelize.fn('ST_SetSRID',
-                            sequelize.fn('ST_Multi', sequelize.fn('ST_GeomFromGeoJSON', JSON.stringify(item.geom))),
-                            4326)
-                    ),
-                    properties: item.properties,
-                    condition: item.condition,
-                    yearBuilt: item.yearBuilt,
-                    updatedAt: new Date()
-                }, {
-                    where: { id: item.id, layerId: layerId } // Safety: Pastikan ID dan Layer cocok
+        // B. Update
+        if (finalUpdates.length > 0) {
+            // Bulk update di Sequelize agak tricky untuk Hooks, kita loop promise
+            const updatePromises = finalUpdates.map(item => {
+                const { id, ...dataToUpdate } = item;
+                return TargetModel.update(dataToUpdate, {
+                    where: { id: item.id },
+                    transaction,
+                    individualHooks: true // Wajib true untuk proses geometri
                 });
             });
-
             await Promise.all(updatePromises);
-            updatedCount = entriesToUpdate.length;
+            updatedCount = finalUpdates.length;
         }
 
-        // Cleanup File Temp
+        await transaction.commit();
         await fs.unlink(filePath).catch(() => {});
 
         return {
-            totalProcessed: entriesToInsert.length + entriesToUpdate.length,
-            insertedOrSkipped: insertedCount,
-            updatedById: updatedCount
+            totalInFile: geojson.features.length,
+            inserted: insertedCount,
+            updated: updatedCount,
+            ignored: candidatesForUpdate.length - updatedCount
         };
 
     } catch (error) {
-        // Selalu hapus file temp jika error
+        await transaction.rollback();
         await fs.unlink(filePath).catch(() => {});
-        console.error("Import Error:", error);
-        throw error;
+        throw error; // Biar controller yang handle response error
     }
 };
 
@@ -271,4 +252,225 @@ export const createLayerFromZip = async (file, metaData) => {
         console.error("Create Layer Import Error:", error);
         throw error;
     }
+};
+
+
+
+// ---------------------------------------------------
+// HELPER FUNCTIONS
+// ---------------------------------------------------
+
+/**
+ * Mengubah Feature GeoJSON -> Object Row Database
+ * Menggunakan Schema untuk pemetaan cerdas
+ */
+const mapFeatureToRow = (feature, schema, layer, layerId) => {
+    // 1. Kamus Mapping Kolom Fisik (Mapping Key Schema -> Kolom DB)
+    const PHYSICAL_MAP = {
+        'nama': 'name',
+        'tahunPengadaan': 'yearBuilt',
+        'noRegister': 'regNumber',
+        'nomorRegister': 'regNumber',
+        'NO_REGIS': 'regNumber', // Jaga-jaga
+        'pemilik': 'managedBy',
+        'diolah': 'managedBy',
+        'sumberData': 'dataSource',
+        'kondisi': 'condition'
+    };
+
+    // 2. SANITASI GEOMETRI (Fix 3D & Single/Multi Type)
+    let sanitizedGeom;
+    try {
+        sanitizedGeom = fixGeometry(feature.geometry, layer.geometryType);
+    } catch (e) {
+        console.error("Geometry Error:", e.message);
+        return null; // Skip jika geometri rusak
+    }
+
+    if (!sanitizedGeom) return null;
+
+    // 3. Generate Hash & Setup Awal
+    const geomHash = crypto.createHash('md5')
+        .update(JSON.stringify(sanitizedGeom))
+        .digest('hex');
+
+    const rowData = {
+        layerId,
+        geom: sanitizedGeom,
+        importHash: geomHash,
+        name: "Tanpa Nama", // Default value
+        properties: {}
+    };
+
+    const rawProps = feature.properties || {};
+    const rawKeys = Object.keys(rawProps);
+
+    const normalize = (str) => (str ? str.toString().toLowerCase().trim() : '');
+
+    // console.log("==========================================");
+    // console.log("FILE HEADERS (RAW PROPS):", Object.keys(rawProps));
+    // console.log("==========================================\n");
+
+    // 4. Schema Mapping Loop
+    schema.definition.forEach(rule => {
+        // console.log("===START ROW DATA===")
+        // console.log(rule)
+        let val = undefined;
+
+        // --- A. Cek Exact Match (Prioritas 1) ---
+        if (rawProps[rule.key] !== undefined) {
+            // console.log("1st block if, I'M Properties")
+            val = rawProps[rule.key];
+        }
+
+        // --- B. Cek Import Alias (Prioritas 2) ---
+        if (val === undefined && rule.import_alias && Array.isArray(rule.import_alias)) {
+            // console.log("2nd block if, I'M Import")
+            // Cari header file yang lowercase-nya cocok dengan salah satu alias lowercase
+            const matchKey = rawKeys.find(headerKey => {
+                const normHeader = normalize(headerKey);
+                return rule.import_alias.some(alias => normalize(alias) === normHeader);
+            });
+
+            if (matchKey) val = rawProps[matchKey];
+        }
+
+        // --- C. Cek Export Alias (Prioritas 3 - THE FIX) ---
+        if (val === undefined && rule.export_alias) {
+            // console.log("3rd block if, I'M Export")
+            // Cari header file yang lowercase-nya SAMA PERSIS dengan export_alias lowercase
+            const targetAlias = normalize(rule.export_alias);
+
+            const matchKey = rawKeys.find(headerKey =>
+                normalize(headerKey) === targetAlias
+            );
+
+            if (matchKey) val = rawProps[matchKey];
+        }
+
+        // --- STEP D: Fallback 'Soft Match' (Opsional tapi berguna) ---
+        if (val === undefined) {
+            // console.log("4th block if, I'M Fallback")
+            const cleanKeySchema = normalize(rule.key).replace(/_/g, '');
+            const matchKey = rawKeys.find(headerKey =>
+                normalize(headerKey).replace(/_/g, '') === cleanKeySchema
+            );
+            if (matchKey) val = rawProps[matchKey];
+        }
+
+        console.log("Value :", val)
+
+        // --- D. Penempatan Data (Placement) ---
+        if (val !== undefined && val !== null) {
+            // Bersihkan spasi jika string
+            if (typeof val === 'string') val = val.trim();
+
+            // Cek apakah key ini harus masuk ke kolom fisik DB?
+            const targetPhysicalCol = PHYSICAL_MAP[rule.key];
+            // console.log("targetPhysicalCol :", targetPhysicalCol);
+
+            if (targetPhysicalCol) {
+                rowData[targetPhysicalCol] = val; // Masuk ke root (misal: yearBuilt)
+            } else {
+                rowData.properties[rule.key] = val; // Masuk ke properties JSONB
+            }
+        }
+        // console.log("===END ROW DATA===\n")
+    });
+
+    // 5. Fallback Name (Safety Net)
+    // Jika dari loop di atas 'nama' belum ketemu, kita cari kolom umum
+    if (rowData.name === "Tanpa Nama") {
+        // Cari manual case-insensitive untuk NAMOBJ / NAME / NAMA
+        const potentialNameKeys = ['NAMOBJ', 'NAME', 'NAMA', 'NM_JALAN'];
+
+        const fallbackKey = rawKeys.find(k =>
+            potentialNameKeys.includes(k.toUpperCase().trim())
+        );
+
+        if (fallbackKey && rawProps[fallbackKey]) {
+            rowData.name = rawProps[fallbackKey];
+        }
+        // Cek juga barangkali masuk ke properties.nama tapi lupa di-map ke fisik
+        else if (rowData.properties.nama) {
+            rowData.name = rowData.properties.nama;
+        }
+    }
+
+    return rowData;
+};
+
+const isDataChanged = (newData, oldData) => {
+    // 1. Cek Hash Geometri
+    // Pastikan di Model Sequelize Anda, kolom 'import_hash' dimapping ke 'importHash'
+    if (oldData.importHash && newData.importHash) {
+        if (newData.importHash !== oldData.importHash) return true;
+    } else {
+        // Fallback jika hash null di DB lama
+        // Warning: JSON.stringify geometry mungkin beda urutan key, tapi cukup untuk fallback
+        if (JSON.stringify(newData.geom) !== JSON.stringify(oldData.geom)) return true;
+    }
+
+    // 2. Cek Kolom Fisik
+    if (newData.condition !== oldData.condition) return true;
+    // Pakai loose equality (==) karena kadang DB return string "2020", SHP return int 2020
+    if (newData.yearBuilt != oldData.yearBuilt) return true;
+    if (newData.name !== oldData.name) return true;
+
+    // 3. Cek Properties
+    if (!_.isEqual(newData.properties, oldData.properties)) return true;
+
+    return false;
+};
+
+/**
+ * Memaksa koordinat menjadi 3D [x, y, 0] jika inputnya hanya 2D [x, y].
+ * Solusi untuk error: "Column has Z dimension but geometry does not"
+ */
+const ensure3D = (coords) => {
+    if (!Array.isArray(coords)) return coords;
+
+    // Cek Base Case: Array angka [x, y]
+    if (coords.length > 0 && typeof coords[0] === 'number') {
+        if (coords.length === 2) {
+            return [coords[0], coords[1], 0]; // Tambah Z=0
+        }
+        return coords;
+    }
+    // Recursive Case (Line/Polygon)
+    return coords.map(ensure3D);
+};
+
+/**
+ * Memperbaiki Geometri:
+ * 1. Auto Cast Single -> Multi (misal Polygon -> MultiPolygon)
+ * 2. Auto Force 3D (tambah Z index)
+ */
+const fixGeometry = (geojsonGeom, targetTypeDB) => {
+    if (!geojsonGeom || !geojsonGeom.type) return null;
+
+    let finalGeom = { ...geojsonGeom };
+    const inputType = finalGeom.type;
+    const targetType = targetTypeDB.toUpperCase(); // 'LINE', 'POLYGON', 'POINT'
+
+    // STEP 1: FORCE 3D
+    finalGeom.coordinates = ensure3D(finalGeom.coordinates);
+
+    // STEP 2: CASTING TYPE
+    // Kasus: DB butuh POLYGON (MultiPolygon)
+    if (targetType === 'POLYGON') {
+        if (inputType === 'Polygon') {
+            return { type: 'MultiPolygon', coordinates: [finalGeom.coordinates] };
+        }
+        if (inputType === 'MultiPolygon') return finalGeom;
+    }
+    // Kasus: DB butuh LINE (MultiLineString)
+    else if (targetType === 'LINE') {
+        if (inputType === 'LineString') {
+            return { type: 'MultiLineString', coordinates: [finalGeom.coordinates] };
+        }
+        if (inputType === 'MultiLineString') return finalGeom;
+    }
+
+    return finalGeom; // Default return (misal Point)
 };

@@ -1,25 +1,80 @@
 import db from "../models/index.js";
-import shpwrite from '@mapbox/shp-write';
+import mapshaper from 'mapshaper';
 import tokml from 'tokml';
 
-const { Layer, SpatialPoint, SpatialLine, SpatialPolygon, FeatureAttachment } = db;
+const { Layer, LayerSchema, SpatialPoint, SpatialLine, SpatialPolygon, FeatureAttachment } = db;
+
+// ==========================================
+// 1. KONFIGURASI & HELPER
+// ==========================================
+
+// Peta Mapping: Key Schema (JSON) -> Atribut Model Sequelize (Database Fisik)
+const PHYSICAL_MAP = {
+    'nama': 'name',
+    'tahunPengadaan': 'yearBuilt',
+    'tahunPerbaikanTerakhir': 'yearBuilt',
+    'noRegister': 'regNumber',
+    'nomorRegister': 'regNumber',
+    'kodeAset': 'assetCode',
+    'pemilik': 'managedBy',
+    'sumberData': 'dataSource',
+    'kondisi': 'condition'
+};
 
 /**
- * Service untuk Export Layer ke format SHP, KML, atau GeoJSON
- * @param {string} layerId - UUID Layer
- * @param {string} format - 'shp', 'kml', 'geojson'
+ * Membersihkan nilai agar aman ditulis ke format DBF (Shapefile).
+ * Mencegah error "Mismatch" karena nilai null/undefined.
  */
+const cleanValue = (val) => {
+    if (val === null || val === undefined) return ""; // Wajib string kosong
+    if (typeof val === 'object') return JSON.stringify(val).substring(0, 250);
+    if (typeof val === 'string') return val.replace(/\r?\n|\r/g, " ").trim(); // Hapus Enter/Newline
+    return val;
+};
+
+/**
+ * Membuang koordinat Z (3D) menjadi 2D [x, y].
+ * Library shp-write terkadang gagal menulis geometri 3D, menyebabkan mismatch.
+ */
+const stripZ = (coords) => {
+    if (!Array.isArray(coords)) return coords;
+    if (coords.length === 0) return coords;
+
+    // Base case: [x, y, z] -> ambil 2 depan saja
+    if (typeof coords[0] === 'number') {
+        return coords.slice(0, 2);
+    }
+    // Recursive case (untuk Line/Polygon)
+    return coords.map(stripZ);
+};
+
+// ==========================================
+// 2. MAIN FUNCTION
+// ==========================================
+
 export const exportLayerData = async (layerId, format = 'shp') => {
-    // 1. Cek Layer & Tentukan Model Target
+    // --- STEP A: VALIDASI LAYER & SCHEMA ---
     const layer = await Layer.findByPk(layerId);
     if (!layer) throw new Error("Layer tidak ditemukan");
 
+    // Ambil Schema Definition
+    const schema = await LayerSchema.findOne({
+        where: { sub_category: layer.subCategory }
+    });
+
+    if (!schema || !schema.definition) {
+        throw new Error(`Schema definition tidak ditemukan untuk kategori: ${layer.subCategory}`);
+    }
+    const definitions = schema.definition;
+
+    // --- STEP B: TENTUKAN TARGET MODEL ---
     let TargetModel;
     if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
     else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
     else if (layer.geometryType === 'POLYGON') TargetModel = SpatialPolygon;
+    else throw new Error("Tipe geometri layer tidak dikenali");
 
-    // 2. Ambil Data dari Database (Termasuk 1 Foto terbaru)
+    // --- STEP C: AMBIL DATA ---
     const features = await TargetModel.findAll({
         where: { layerId },
         include: [
@@ -31,110 +86,123 @@ export const exportLayerData = async (layerId, format = 'shp') => {
                 order: [['created_at', 'DESC']]
             }
         ],
-        // Ambil kolom-kolom penting
-        attributes: ['id', 'name', 'geom', 'properties', 'yearBuilt', 'condition', 'regNumber', 'assetCode', 'managedBy', 'dataSource']
+        attributes: [
+            'id', 'name', 'geom', 'properties',
+            'yearBuilt', 'regNumber', 'assetCode',
+            'managedBy', 'dataSource', 'condition'
+        ]
     });
 
-    if (features.length === 0) throw new Error("Layer ini kosong, tidak ada data untuk diexport.");
+    if (features.length === 0) throw new Error("Layer ini kosong (tidak ada data).");
 
-    // 3. Mapping & Flattening Data ke format GeoJSON Standard
-    const geojsonFeatures = features.map(item => {
-        const plain = item.toJSON();
+    const targetFormat = format.toLowerCase();
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
 
-        // --- A. Logic Attachment URL ---
-        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-        let photoLink = '';
-        if (plain.attachments && plain.attachments.length > 0) {
-            // Pastikan tidak ada double slash jika fileUrl sudah ada '/'
-            photoLink = `${baseUrl}${plain.attachments[0].fileUrl.startsWith('/') ? '' : '/'}${plain.attachments[0].fileUrl}`;
-        }
+    // --- STEP D: MAPPING & SANITASI ---
+    const geojsonFeatures = features
+        .map(item => {
+            const plain = item.toJSON();
 
-        // --- B. Logic HTML Description (Khusus KML) ---
-        // Membuat tabel HTML agar tampilan popup di Google Earth rapi
-        const propsKeys = Object.keys(plain.properties || {});
-        let htmlDescription = `
-            <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-                <tr><td style="background-color:#eee;"><b>Kondisi</b></td><td>${plain.condition || '-'}</td></tr>
-                <tr><td style="background-color:#eee;"><b>Tahun</b></td><td>${plain.yearBuilt || '-'}</td></tr>
-                <tr><td style="background-color:#eee;"><b>Pemilik</b></td><td>${plain.managedBy || '-'}</td></tr>
-                <tr><td style="background-color:#eee;"><b>No. Reg</b></td><td>${plain.regNumber || '-'}</td></tr>
-        `;
+            // 1. Validasi Geometri (Critical Check)
+            if (!plain.geom || !plain.geom.coordinates) return null;
+            if (Array.isArray(plain.geom.coordinates) && plain.geom.coordinates.length === 0) return null;
 
-        // Loop dynamic properties dari JSONB
-        propsKeys.forEach(key => {
-            htmlDescription += `<tr><td style="background-color:#eee;"><b>${key}</b></td><td>${plain.properties[key]}</td></tr>`;
-        });
+            // 2. Sanitasi Geometri (3D -> 2D)
+            const cleanGeom = {
+                type: plain.geom.type,
+                coordinates: stripZ(plain.geom.coordinates)
+            };
 
-        // Tambahkan Gambar di bawah tabel jika ada
-        if (photoLink) {
-            htmlDescription += `
-                <tr><td colspan="2" style="text-align:center; padding:10px;">
-                    <img src="${photoLink}" width="300" style="border:1px solid #ccc; padding:2px;" /><br/>
-                    <small><a href="${photoLink}">Lihat Ukuran Penuh</a></small>
-                </td></tr>
-            `;
-        }
-        htmlDescription += `</table>`;
+            // 3. URL Foto
+            let photoLink = '';
+            if (plain.attachments && plain.attachments.length > 0) {
+                photoLink = `${baseUrl}${plain.attachments[0].fileUrl.startsWith('/') ? '' : '/'}${plain.attachments[0].fileUrl}`;
+            }
 
-        // --- C. Menyusun Attributes (Properties) ---
-        const attributes = {
-            // SYSTEM ID (Sangat Penting untuk Import/Update Round-Trip)
-            system_id: plain.id,
+            // 4. Build Properties
+            let finalProperties = {};
+            let htmlRows = '';
 
-            // Atribut Standar
-            NAME: plain.name ? plain.name.substring(0, 254) : 'No Name',
-            TAHUN: plain.yearBuilt || 0,
-            KONDISI: plain.condition || '',
-            NO_REG: plain.regNumber || '',
-            KODE: plain.assetCode || '',
-            PEMILIK: plain.managedBy || '',
-            SUMBER: plain.dataSource || '',
+            definitions.forEach(def => {
+                // a. Cari Data (Physical vs JSON)
+                let rawValue;
+                if (PHYSICAL_MAP[def.key]) {
+                    rawValue = plain[PHYSICAL_MAP[def.key]];
+                } else {
+                    rawValue = plain.properties ? plain.properties[def.key] : null;
+                }
 
-            // Link Foto (Untuk SHP/GeoJSON user bisa copas)
-            LINK_FOTO: photoLink,
+                // b. Bersihkan Nilai
+                const safeValue = cleanValue(rawValue);
 
-            // Konten HTML (Khusus untuk KML Description)
-            HTML_CONTENT: htmlDescription,
+                // c. Assign ke Output
+                if (targetFormat === 'kml') {
+                    if (def.is_visible_public !== false) {
+                        htmlRows += `<tr><td style="background-color:#eee;"><b>${def.label}</b></td><td>${safeValue}</td></tr>`;
+                    }
+                    finalProperties[def.label] = safeValue;
+                } else {
+                    // SHP/GeoJSON: Gunakan Export Alias (Max 10 Char)
+                    let outKey = def.export_alias;
+                    if (!outKey) outKey = def.key.substring(0, 10).toUpperCase();
+                    finalProperties[outKey] = safeValue;
+                }
+            });
 
-            // Spread sisa properties JSONB agar jadi kolom fisik di SHP
-            ...plain.properties
-        };
+            // 5. Output Construction
+            if (targetFormat === 'kml') {
+                if (photoLink) {
+                    htmlRows += `<tr><td colspan="2"><img src="${photoLink}" width="300" /></td></tr>`;
+                }
+                const htmlDescription = `
+                    <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                        ${htmlRows}
+                    </table>`;
 
-        return {
-            type: "Feature",
-            properties: attributes,
-            geometry: plain.geom
-        };
-    });
+                return {
+                    type: "Feature",
+                    properties: {
+                        NAME: plain.name || 'No Name',
+                        description: htmlDescription
+                    },
+                    geometry: cleanGeom
+                };
+            } else {
+                // SHP & GeoJSON
+                finalProperties['SYSTEM_ID'] = cleanValue(plain.id);
+                finalProperties['FOTO'] = cleanValue(photoLink);
 
-    // Bungkus dalam FeatureCollection
+                return {
+                    type: "Feature",
+                    properties: finalProperties,
+                    geometry: cleanGeom
+                };
+            }
+        })
+        .filter(f => f !== null); // Hapus data invalid
+
+    if (geojsonFeatures.length === 0) throw new Error("Data ditemukan tapi geometri tidak valid.");
+
     const geojson = {
         type: "FeatureCollection",
         features: geojsonFeatures
     };
 
-    // Bersihkan nama file dari karakter aneh
     const safeName = layer.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const targetFormat = format.toLowerCase();
 
-    // 4. SWITCH FORMAT OUTPUT
-
-    // === OPSI 1: KML (Google Earth) ===
+    // --- STEP E: EXPORT EXECUTION ---
     if (targetFormat === 'kml') {
         const kmlString = tokml(geojson, {
             documentName: layer.name,
-            name: 'NAME',           // Kolom 'NAME' jadi Label di Peta
-            description: 'HTML_CONTENT' // Kolom 'HTML_CONTENT' jadi Isi Popup
+            name: 'NAME',
+            description: 'description'
         });
-
         return {
             filename: `${safeName}.kml`,
             mimeType: 'application/vnd.google-earth.kml+xml',
-            buffer: Buffer.from(kmlString) // String XML ke Buffer
+            buffer: Buffer.from(kmlString)
         };
     }
-
-    // === OPSI 2: GEOJSON (Developer/Web) ===
     else if (targetFormat === 'geojson' || targetFormat === 'json') {
         return {
             filename: `${safeName}.geojson`,
@@ -142,26 +210,45 @@ export const exportLayerData = async (layerId, format = 'shp') => {
             buffer: Buffer.from(JSON.stringify(geojson, null, 2))
         };
     }
-
-    // === OPSI 3: SHAPEFILE ZIP (GIS Desktop - Default) ===
     else {
-        const options = {
-            folder: safeName,
-            types: {
-                POINT: 'Point',
-                POLYGON: 'Polygon',
-                LINE: 'PolyLine'
-            }
-        };
+        // --- SHP WRITE LOGIC (FIXED) ---
+        try {
+            // Mapshaper bekerja dengan menerima Input File (Virtual) dan Command String
 
-        // shpwrite mengembalikan Promise berisi Base64 String
-        const base64String = await shpwrite.zip(geojson, options);
+            // A. Siapkan Virtual File
+            // Kita beri nama 'input.json'
+            const inputFiles = {
+                'input.json': geojson // Mapshaper bisa baca Object JS langsung
+            };
 
-        // Konversi Base64 ke Binary Buffer agar content-length valid
-        return {
-            filename: `${safeName}.zip`,
-            mimeType: 'application/zip',
-            buffer: Buffer.from(base64String, 'base64')
-        };
+            // B. Siapkan Command
+            // -i input.json : Input file
+            // -o output.zip : Output langsung ke ZIP
+            // format=shapefile : Format SHP
+            // target=input.json : Target layer yang mau diproses
+
+            // Tips: Anda bisa tambah 'snap' untuk memperbaiki gap, atau 'clean' untuk topology
+            const cmd = `-i input.json -o ${safeName}.zip format=shapefile`;
+
+            // C. Eksekusi
+            const output = await mapshaper.applyCommands(cmd, inputFiles);
+
+            // Output mapshaper adalah object berisi buffer file-file hasil
+            // output['Jalan.zip']
+
+            // Karena nama file output dinamis (safeName.zip), kita ambil value pertama dari object output
+            const outputBuffer = Object.values(output)[0];
+
+            return {
+                filename: `${safeName}.zip`,
+                mimeType: 'application/zip',
+                buffer: outputBuffer
+            };
+
+        } catch (error) {
+            console.error("Mapshaper Error:", error);
+            // Mapshaper error message biasanya sangat jelas (misal: "Field name too long")
+            throw new Error("Gagal convert SHP via Mapshaper: " + error.message);
+        }
     }
 };
