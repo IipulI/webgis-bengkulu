@@ -31,8 +31,6 @@ export const getOneLayerSchema = async (req, res, next) => {
     const schemaId = req.params.id;
     const responseBuilder = new ResponseBuilder(res);
 
-    console.log(schemaId)
-
     try {
         const data = await layerSchemaService.getOneLayerSchema(schemaId);
 
