@@ -4,8 +4,8 @@ import { getAssetReport } from "../controllers/report.controller.js";
 import { formatter, getUuidList } from "../controllers/other.controller.js";
 import { validateLogin } from "../validators/auth.validator.js";
 import { checkJwt } from "../middleware/jwt.middleware.js";
-// import { attachCurrentUser } from "../middleware/attach-user.middleware.js";
-// import { checkRole } from "../middleware/authorization.middleware.js";
+import { attachCurrentUser } from "../middleware/attach-user.middleware.js";
+import { checkRole } from "../middleware/authorization.middleware.js";
 
 import layerRouter from "./layers.route.js"
 import featureRouter from "./features.route.js"
@@ -26,7 +26,7 @@ router.use('/layer', layerRouter)
 router.use('/feature', checkJwt(), featureRouter)
 router.use('/attachment', checkJwt(), attachmentRoutes);
 router.use('/layer-schema', layerSchemaRoute)
-router.use('/user', userRoute)
+router.use('/user', checkJwt(), attachCurrentUser, checkRole(['admin']), userRoute)
 
 
 // for dev tool

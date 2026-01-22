@@ -152,3 +152,22 @@ export const deleteUser = async(userId) => {
         throw new Error(error.message)
     }
 }
+
+export const resetPassword = async(userId, password) => {
+    const user = await User.findByPk(userId)
+    if (!user) {
+        throw new NotFoundError("User tidak ditemukan")
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    try {
+        await user.update({
+            password: hashedPassword,
+        })
+    }
+    catch (error) {
+        console.error(error);
+        throw new Error(error.message)
+    }
+}

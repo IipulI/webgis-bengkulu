@@ -9,6 +9,7 @@ router.get('/:id', userController.getOneUser)
 router.post('/', userController.createUser)
 
 router.put('/:id', userController.updateUser)
+router.put('/:id/reset-password', userController.resetPassword)
 
 router.delete('/:id', userController.deleteUser)
 

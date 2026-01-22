@@ -91,3 +91,20 @@ export const deleteUser = async (req, res, next) => {
         next(error);
     }
 }
+
+export const resetPassword = async (req, res, next) => {
+    const id = req.params.id;
+    const newPassword = req.body.password;
+    const responseBuilder = new ResponseBuilder(res)
+
+    try {
+        await userService.resetPassword(id, newPassword);
+
+        responseBuilder.status("success")
+            .message("Berhasil mengubah data")
+            .json()
+    }
+    catch (error) {
+        next(error);
+    }
+}

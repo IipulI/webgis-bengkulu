@@ -18,8 +18,13 @@ export const checkRole = (roles) => {
 
         const userRole = req.user.role.name;
 
+        // Preventing case-sensitive name such Admin wouldn't match admin
+        const hasPermission = allowedRoles.some(role =>
+            role.toLowerCase() === userRole.toLowerCase()
+        );
+
         // Check if the user's role is in the list of allowed roles
-        if (allowedRoles.includes(userRole)) {
+        if (hasPermission) {
             // The user has the required role, so continue to the next handler
             return next();
         } else {
