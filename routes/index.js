@@ -23,7 +23,7 @@ router.get('/category', getCategoryReport)
 router.get('/sub-category', getSubCategoryReport)
 
 router.use('/layer', layerRouter)
-router.use('/feature', checkJwt(), featureRouter)
+router.use('/feature', featureRouter)
 router.use('/attachment', checkJwt(), attachmentRoutes);
 router.use('/layer-schema', layerSchemaRoute)
 router.use('/user', checkJwt(), attachCurrentUser, checkRole(['admin']), userRoute)
