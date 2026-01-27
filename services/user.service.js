@@ -80,7 +80,7 @@ export const createUser = async(body) => {
 
     const staffRole = await Role.findOne({
         where: {
-            name: "Staff"
+            id: body.roleId
         }
     })
     if (!staffRole) {
