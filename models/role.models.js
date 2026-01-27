@@ -4,7 +4,10 @@ import { v7 as uuid7 } from "uuid";
 export default (sequelize) => {
     class Role extends Model {
         static associate(models) {
-            // define assoc here
+            this.hasMany(models.RolePermission, {
+                foreignKey: 'role_id',
+                as: 'rolePermission',
+            })
         }
     }
 

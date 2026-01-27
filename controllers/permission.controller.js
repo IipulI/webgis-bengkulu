@@ -1,4 +1,4 @@
-import * as roleService from "../services/role.service.js";
+import * as permissionService from '../services/permission.service.js';
 import ResponseBuilder from "../utils/response.js";
 import { getPagingData } from "../utils/pagination.js";
 
@@ -8,7 +8,7 @@ export const getAll = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
 
     try {
-        const data = await roleService.getAllRoles(page, size)
+        const data = await permissionService.getAll(page, size)
 
         let payload
         if (data.isPaginated){
@@ -27,30 +27,14 @@ export const getAll = async (req, res, next) => {
     }
 }
 
-export const getOne = async (req, res, next) => {
-    const id = req.params.id;
-    const responseBuilder = new ResponseBuilder(res)
-
-    try {
-        const data = await roleService.getOneRole(id)
-
-        responseBuilder
-            .status('success')
-            .message("Berhasil mengambil data")
-            .json(data)
-    }
-    catch (error) {
-        next(error)
-    }
-}
-
 export const create = async (req, res, next) => {
     const responseBuilder = new ResponseBuilder(res)
 
-    try{
-        const data = await roleService.createRole(req.body)
+    try {
+        const data = await permissionService.create(req.body)
 
         responseBuilder
+            .status('success')
             .code(201)
             .message("Berhasil menyimpan data")
             .json(data)
@@ -61,13 +45,14 @@ export const create = async (req, res, next) => {
 }
 
 export const update = async (req, res, next) => {
-    const roleId = req.params.id
     const responseBuilder = new ResponseBuilder(res)
+    const id = req.params.id;
 
     try {
-        const data = await roleService.updateRole(roleId, req.body)
+        const data = await permissionService.update(id, req.body)
 
         responseBuilder
+            .status('success')
             .message("Berhasil menyimpan data")
             .json(data)
     }
@@ -76,14 +61,15 @@ export const update = async (req, res, next) => {
     }
 }
 
-export const deleteRole = async (req, res, next) => {
-    const roleId = req.params.id
+export const destroy = async (req, res, next) => {
+    const id = req.params.id;
     const responseBuilder = new ResponseBuilder(res)
 
     try {
-        await roleService.deleteRole(roleId)
+        await permissionService.deletePermission(id)
 
         responseBuilder
+            .status('success')
             .message("Berhasil menghapus data")
             .json()
     }
