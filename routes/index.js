@@ -12,6 +12,7 @@ import featureRouter from "./features.route.js"
 import attachmentRoutes from "./attachment.route.js"
 import layerSchemaRoute from "./layer-schema.route.js";
 import userRoute from "./user.route.js";
+import roleRoute from "./role.route.js"
 import { getCategoryReport, getSubCategoryReport } from "../controllers/report.controller.js"
 
 const router = Router();
@@ -27,6 +28,7 @@ router.use('/feature', featureRouter)
 router.use('/attachment', checkJwt(), attachmentRoutes);
 router.use('/layer-schema', layerSchemaRoute)
 router.use('/user', checkJwt(), attachCurrentUser, checkRole(['admin']), userRoute)
+router.use('/role', checkJwt(), attachCurrentUser, checkRole(['admin']), roleRoute)
 
 
 // for dev tool
