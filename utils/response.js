@@ -8,6 +8,7 @@ class ResponseBuilder {
     this._code = null;
     this._message = null;
     this._data = null;
+    this._meta = {};
   }
 
   /**
@@ -41,6 +42,17 @@ class ResponseBuilder {
   }
 
   /**
+   * The "Magic" Method: Adds any key-value pair to the top level.
+   * @param {string} key - The name of the key (e.g., 'schema', 'version', 'author').
+   * @param {any} value - The value for that key.
+   * @returns {this}
+   */
+  add(key, value) {
+    this._meta[key] = value;
+    return this;
+  }
+
+  /**
    * Builds and sends the final JSON response.
    * @param {object | Array | null} payload - The data for a success response or errors for a failure response.
    */
@@ -53,6 +65,7 @@ class ResponseBuilder {
     const responseBody = {
       status: finalCode,
       message: this._message || this._status,
+      ...this._meta,
     };
 
     if (this._status === "success") {

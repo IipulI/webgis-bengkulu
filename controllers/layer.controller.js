@@ -39,10 +39,13 @@ export const getDetailLayer = async (req, res, next) => {
             payload = data.rows[0];
         }
 
+        console.log(payload);
+
         responseBuilder
             .status('success')
             .code(200)
             .message("berhasil mengambil data")
+            .add('schema', data.schema)
             .json(payload)
     }
     catch (error) {

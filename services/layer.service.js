@@ -28,6 +28,12 @@ export const getLayerDetailDashboard = async (id, page, size) => {
         throw new NotFoundError("Layer tidak ditemukan");
     }
 
+    const layerSchema = await LayerSchema.findOne({
+        where: {
+            subCategory: layer.subCategory,
+        }
+    })
+
     let TargetModel;
     if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
     else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
@@ -55,7 +61,8 @@ export const getLayerDetailDashboard = async (id, page, size) => {
         return {
             count: count,
             rows: [layerData],
-            isPaginated: isPaginated
+            isPaginated: isPaginated,
+            schema: layerSchema
         };
 
     } catch (error) {
