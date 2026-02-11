@@ -80,12 +80,22 @@ export const createUser = async(body) => {
 
     const staffRole = await Role.findOne({
         where: {
-            id: body.roleId
+            name: "Staff"
         }
     })
     if (!staffRole) {
         throw new NotFoundError("Role tidak ditemukan")
     }
+
+    // Logic jika menggunakan roleId, tapi sementara tidak usah dulu
+    // const staffRole = await Role.findOne({
+    //     where: {
+    //         id: body.roleId
+    //     }
+    // })
+    // if (!staffRole) {
+    //     throw new NotFoundError("Role tidak ditemukan")
+    // }
 
     const hashedPassword = await bcrypt.hash(body.password, 12);
 
