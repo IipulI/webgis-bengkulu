@@ -46,7 +46,7 @@ export const getCategoryReport = async (req, res, next) => {
             subCategory: [
                 {
                     name: "Jaringan",
-                    value: "jarignan"
+                    value: "jaringan"
                 },
                 {
                     name: "Jalan",
