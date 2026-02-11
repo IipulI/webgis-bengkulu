@@ -45,12 +45,16 @@ export const getCategoryReport = async (req, res, next) => {
             value: "jaringan-jalan-dan-jembatan",
             subCategory: [
                 {
-                    name: "Drainase Perkotaan",
-                    value: "drainase-perkotaan"
+                    name: "Jaringan",
+                    value: "jarignan"
                 },
                 {
-                    name: "Pengendalian Banjir",
-                    value: "pengendalian-banjir"
+                    name: "Jalan",
+                    value: "jalan"
+                },
+                {
+                    name: "Jembatan",
+                    value: "jembatan"
                 }
             ]
         },
