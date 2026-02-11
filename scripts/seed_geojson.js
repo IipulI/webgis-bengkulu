@@ -120,16 +120,16 @@ function getRandomColor() {
         console.log('🔌 Koneksi database berhasil.');
 
         const files = [
-            'air_minum.json',
-            'drainase.json',
-            'energi.json',
-            'persampahan.json',
-            'prasarana_lain.json',
-            'pusat_pelayanan.json',
-            'sda.json',
-            'telekomunikasi.json',
-            'transportasi.json',
-            'zonasi.json'
+            'Jembatan_Edit.json',
+            'Jalan_UTM_Edit.json',
+            'Bangunan_Gedung_Edit.json',
+            // 'persampahan.json',
+            // 'prasarana_lain.json',
+            // 'pusat_pelayanan.json',
+            // 'sda.json',
+            // 'telekomunikasi.json',
+            // 'transportasi.json',
+            // 'zonasi.json'
         ];
 
         for (const file of files) {
