@@ -18,6 +18,7 @@ export const getAssetReport = async (req, res, next) => {
         responseBuilder
             .status('success')
             .message("berhasil mengambil data")
+            .add('schema', data.layerSchema)
             .json(payload)
 
     } catch (error) {

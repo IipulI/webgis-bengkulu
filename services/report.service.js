@@ -3,7 +3,7 @@ import { Op } from 'sequelize';
 import ResponseBuilder from "../utils/response.js";
 import { getPagination, getPagingData } from "../utils/pagination.js";
 
-const { AssetView, Sequelize } = db;
+const { AssetView, LayerSchema, Sequelize } = db;
 
 export const getAssetReport = async (query) => {
     const {
@@ -60,6 +60,12 @@ export const getAssetReport = async (query) => {
         order: [['created_at', 'DESC']]
     });
 
+    const layerSchema = await LayerSchema.findOne({
+        where: {
+            subCategory: subCategory
+        }
+    })
+
     const result = rows.map(asset => {
         const plainAsset = asset.get({plain: true});
 
@@ -74,6 +80,7 @@ export const getAssetReport = async (query) => {
 
     return {
         count,
+        layerSchema: layerSchema,
         rows: result,
         isPaginated: true,
     }
