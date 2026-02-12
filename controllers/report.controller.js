@@ -38,6 +38,7 @@ export const getCategoryReport = async (req, res, next) => {
                 {
                     name: "Bangungan Gedung",
                     value: "bangunan-gedung",
+
                 }
             ]
         },
@@ -46,12 +47,8 @@ export const getCategoryReport = async (req, res, next) => {
             value: "jaringan-jalan-dan-jembatan",
             subCategory: [
                 {
-                    name: "Jaringan",
-                    value: "jaringan"
-                },
-                {
-                    name: "Jalan",
-                    value: "jalan"
+                    name: "Jaringan Jalan",
+                    value: "jaringan-jalan"
                 },
                 {
                     name: "Jembatan",
@@ -102,12 +99,8 @@ export const getCategoryReport = async (req, res, next) => {
             value: "pengolahaan-air-limbah-dan-limbah-b3-dan-sanitasi",
             subCategory: [
                 {
-                    name: "Pengendalian Air Limbah",
-                    value: "pengendalian-air-limbah"
-                },
-                {
-                    name: "Pengendalian Limbah B3",
-                    value: "limbah-b3-dan-limbah"
+                    name: "Pengendalian Air Limbah dan Limbah B3",
+                    value: "pengendalian-air-limbah-dan-limbah-b3"
                 },
                 {
                     name: "Sanitasi",
