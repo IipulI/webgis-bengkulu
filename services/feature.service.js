@@ -1,9 +1,10 @@
 import models from '../models/index.js'
 import { sequelize } from "../config/database.js";
 import { NotFoundError, UnprocessableEntityError } from "../utils/custom-error.js";
+import { Op } from "sequelize";
 
 
-const { FeatureAttachment, Layer, SpatialLine, SpatialPoint, SpatialPolygon } = models
+const { FeatureAttachment, Layer, LayerSchema, SpatialLine, SpatialPoint, SpatialPolygon } = models
 
 // export const getAllSpatialFeatureByLayer = async (layerId) => {
 //     const layer = await Layer.findByPk(layerId);
@@ -69,13 +70,29 @@ export const getOneSpatialFeature = async (layerId, featureId) => {
                 model: FeatureAttachment,
                 as: 'attachments',
                 attributes: ['id', 'fileUrl', 'fileType', 'description']
+            },
+            {
+                model: Layer,
+                as: 'layer',
+                attributes: ['id', 'category', 'subCategory']
             }
         ]
     });
 
     if (!feature) throw new NotFoundError("Data spasial tidak ditemukan");
 
-    return feature;
+    const layerSchema = await LayerSchema.findOne({
+        where: {
+            subCategory : {
+                [Op.in]: [feature.layer.category, feature.layer.subCategory]
+            }
+        }
+    })
+
+    return {
+        feature: feature,
+        layerSchema: layerSchema
+    };
 };
 
 export const addSpatialFeatures = async (layerId, spatialData) => {
@@ -271,38 +288,38 @@ const FIXED_TAXONOMY = [
         name: "Bangunan Gedung",
         slug: "bangunan-gedung",
         subs: [
-            { name: "Bangunan Gedung", slug: "bangunan-gedung" }
+            { name: "Bangunan Gedung", slug: "bangunan-gedung", unit: "unit" }
         ]
     },
     {
         name: "Jaringan Jalan dan Jembatan",
         slug: "jaringan-jalan-dan-jembatan",
         subs: [
-            { name: "Jaringan Jalan", slug: "jaringan-jalan" },
-            { name: "Jembatan", slug: "jembatan" }
+            { name: "Jaringan Jalan", slug: "jaringan-jalan", unit: "Kilometer" },
+            { name: "Jembatan", slug: "jembatan", unit: "unit" },
         ]
     },
     {
         name: "Drainase Perkotaan dan Pengendalian Banjir",
         slug: "drainase-perkotaan-dan-pengendalian-banjir",
         subs: [
-            { name: "Drainase Perkotaan", slug: "drainase-perkotaan" },
-            { name: "Pengendalian Banjir", slug: "pengendalian-banjir" }
+            { name: "Drainase Perkotaan", slug: "drainase-perkotaan", unit: "unit" },
+            { name: "Pengendalian Banjir", slug: "pengendalian-banjir", unit: "unit" }
         ]
     },
     {
         name: "Bangunan Sumber Daya Air dan Irigasi",
         slug: "bangunan-sumber-daya-air-dan-irigasi",
         subs: [
-            { name: "Bangunan Sumber Daya Air", slug: "bangunan-sumber-daya-air" },
-            { name: "Irigasi", slug: "irigasi" }
+            { name: "Bangunan Sumber Daya Air", slug: "bangunan-sumber-daya-air", unit: "unit" },
+            { name: "Irigasi", slug: "irigasi", unit: "Kilometer" },
         ]
     },
     {
         name: "Jaringan Air Minum",
         slug: "jaringan-air-minum",
         subs: [
-            { name: "Jaringan Air Minum", slug: "jaringan-air-minum" }
+            { name: "Jaringan Air Minum", slug: "jaringan-air-minum", unit: "Kilometer" }
         ]
     },
     {
