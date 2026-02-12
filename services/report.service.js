@@ -62,9 +62,11 @@ export const getAssetReport = async (query) => {
 
     const layerSchema = await LayerSchema.findOne({
         where: {
-            subCategory: subCategory
+            subCategory: {
+                [Op.in]: [category, subCategory]
+            }
         }
-    })
+    });
 
     const result = rows.map(asset => {
         const plainAsset = asset.get({plain: true});
