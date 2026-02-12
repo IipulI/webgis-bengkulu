@@ -278,8 +278,7 @@ const FIXED_TAXONOMY = [
         name: "Jaringan Jalan dan Jembatan",
         slug: "jaringan-jalan-dan-jembatan",
         subs: [
-            { name: "Jaringan", slug: "jaringan" },
-            { name: "Jalan", slug: "jalan" },
+            { name: "Jaringan Jalan", slug: "jaringan-jalan" },
             { name: "Jembatan", slug: "jembatan" }
         ]
     },
@@ -310,8 +309,7 @@ const FIXED_TAXONOMY = [
         name: "Pengolahaan Air Limbah dan Limbah B3 dan Sanitasi",
         slug: "pengolahaan-air-limbah-dan-limbah-b3-dan-sanitasi",
         subs: [
-            { name: "Pengendalian Air Limbah", slug: "pengendalian-air-limbah" },
-            { name: "Pengendalian Limbah B3", slug: "pengendalian-limbah-b3" },
+            { name: "Pengendalian Air Limbah dan Limbah B3", slug: "pengendalian-air-limbah-dan-limbah-b3" },
             { name: "Sanitasi", slug: "sanitasi" }
         ]
     }
