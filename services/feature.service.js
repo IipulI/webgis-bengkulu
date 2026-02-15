@@ -189,6 +189,18 @@ export const updateSpatialFeatures = async(layerId, featureId, spatialData) => {
             updatePayload.name = spatialData.name;
         }
 
+        if (spatialData.regNumber !== undefined) {
+            updatePayload.regNumber = spatialData.regNumber
+        }
+
+        if (spatialData.yearBuilt !== undefined) {
+            updatePayload.yearBuilt = spatialData.yearBuilt
+        }
+
+        if (spatialData.dataSource !== undefined) {
+            updatePayload.dataSource = spatialData.dataSource
+        }
+
         if (spatialData.properties !== undefined) {
             updatePayload.properties = spatialData.properties;
         }

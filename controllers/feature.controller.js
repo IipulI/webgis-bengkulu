@@ -31,7 +31,8 @@ export const getOneFeature = async (req, res, next) => {
             .status('success')
             .code(200)
             .message("Berhasil mengambil data spasial")
-            .json(data)
+            .add('schema', data.layerSchema)
+            .json(data.feature)
     }
     catch (error) {
         next(error)
