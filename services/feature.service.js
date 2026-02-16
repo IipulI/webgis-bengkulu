@@ -338,8 +338,8 @@ const FIXED_TAXONOMY = [
         name: "Pengolahaan Air Limbah dan Limbah B3 dan Sanitasi",
         slug: "pengolahaan-air-limbah-dan-limbah-b3-dan-sanitasi",
         subs: [
-            { name: "Pengendalian Air Limbah dan Limbah B3", slug: "pengendalian-air-limbah-dan-limbah-b3" },
-            { name: "Sanitasi", slug: "sanitasi" }
+            { name: "Pengendalian Air Limbah dan Limbah B3", slug: "pengendalian-air-limbah-dan-limbah-b3", unit: "unit" },
+            { name: "Sanitasi", slug: "sanitasi", unit: "unit" }
         ]
     }
 ];
@@ -354,7 +354,8 @@ export const getAssetsByCategory = async () => {
             name: sub.name,
             _db_slug: sub.slug,
             total_assets: 0,
-            layers_count: 0
+            layers_count: 0,
+            unit: sub.unit
         }))
     }));
 
