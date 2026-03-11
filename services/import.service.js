@@ -358,19 +358,19 @@ const mapFeatureToRow = (feature, schema, layer, layerId) => {
             if (matchKey) val = rawProps[matchKey];
         }
 
-        console.log("Value :", val)
-
         // --- D. Penempatan Data (Placement) ---
-        if (val !== undefined && val !== null) {
+        if (val !== undefined && val !== null && val !== '') {
             // Bersihkan spasi jika string
             if (typeof val === 'string') val = val.trim();
 
             // Cek apakah key ini harus masuk ke kolom fisik DB?
-            const targetPhysicalCol = PHYSICAL_MAP[rule.key];
+            // const targetPhysicalCol = PHYSICAL_MAP[rule.key];
             // console.log("targetPhysicalCol :", targetPhysicalCol);
 
-            if (targetPhysicalCol) {
-                rowData[targetPhysicalCol] = val; // Masuk ke root (misal: yearBuilt)
+            // console.log(`key : ${rule.key}, path : ${rule.path}, ${rule.path === 'root'}`)
+
+            if (rule.path === 'root') {
+                rowData[rule.key] = val; // Masuk ke root (misal: yearBuilt)
             } else {
                 rowData.properties[rule.key] = val; // Masuk ke properties JSONB
             }

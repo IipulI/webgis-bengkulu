@@ -126,14 +126,14 @@ export const exportLayerData = async (layerId, format = 'shp') => {
             definitions.forEach(def => {
                 // a. Cari Data (Physical vs JSON)
                 let rawValue;
-                if (PHYSICAL_MAP[def.key]) {
-                    rawValue = plain[PHYSICAL_MAP[def.key]];
+                if (def.path === 'root') {
+                    rawValue = plain[def.key];
                 } else {
                     rawValue = plain.properties ? plain.properties[def.key] : null;
                 }
 
                 // b. Bersihkan Nilai
-                const safeValue = cleanValue(rawValue);
+                let safeValue = cleanValue(rawValue);
 
                 // c. Assign ke Output
                 if (targetFormat === 'kml') {
@@ -145,6 +145,12 @@ export const exportLayerData = async (layerId, format = 'shp') => {
                     // SHP/GeoJSON: Gunakan Export Alias (Max 10 Char)
                     let outKey = def.export_alias;
                     if (!outKey) outKey = def.key.substring(0, 10).toUpperCase();
+
+                    if (targetFormat === 'shp') {
+                        let strVal = String(safeValue || "");
+                        safeValue = strVal + ' '.repeat(Math.max(0, 254 - strVal.length));
+                    }
+
                     finalProperties[outKey] = safeValue;
                 }
             });
@@ -188,6 +194,8 @@ export const exportLayerData = async (layerId, format = 'shp') => {
         features: geojsonFeatures
     };
 
+    console.log(geojson.features);
+
     const safeName = layer.name.replace(/[^a-zA-Z0-9]/g, '_');
 
     // --- STEP E: EXPORT EXECUTION ---
@@ -213,42 +221,42 @@ export const exportLayerData = async (layerId, format = 'shp') => {
     else {
         // --- SHP WRITE LOGIC (FIXED) ---
         try {
-            // Mapshaper bekerja dengan menerima Input File (Virtual) dan Command String
+            // 1. Validasi final: Pastikan ada feature sebelum dilempar ke Mapshaper
+            if (!geojson.features || geojson.features.length === 0) {
+                throw new Error("Tidak ada data geometri valid untuk diekspor ke SHP.");
+            }
 
-            // A. Siapkan Virtual File
-            // Kita beri nama 'input.json'
+            // 2. Siapkan Virtual File (Ubah object GeoJSON ke Buffer!)
+            const geojsonBuffer = Buffer.from(JSON.stringify(geojson));
             const inputFiles = {
-                'input.json': geojson // Mapshaper bisa baca Object JS langsung
+                'input.json': geojsonBuffer
             };
 
-            // B. Siapkan Command
-            // -i input.json : Input file
-            // -o output.zip : Output langsung ke ZIP
-            // format=shapefile : Format SHP
-            // target=input.json : Target layer yang mau diproses
-
-            // Tips: Anda bisa tambah 'snap' untuk memperbaiki gap, atau 'clean' untuk topology
+            // 3. Siapkan Command
+            // Tambahkan parameter 'name' agar file di dalam ZIP mengikuti safeName
             const cmd = `-i input.json -o ${safeName}.zip format=shapefile`;
 
-            // C. Eksekusi
+            // 4. Eksekusi Mapshaper
             const output = await mapshaper.applyCommands(cmd, inputFiles);
 
-            // Output mapshaper adalah object berisi buffer file-file hasil
-            // output['Jalan.zip']
+            // 5. Ambil Buffer ZIP dari output
+            // Panggil nama file secara eksplisit untuk mencegah salah ambil data log
+            const zipFileName = `${safeName}.zip`;
+            const outputBuffer = output[zipFileName] || Object.values(output)[0];
 
-            // Karena nama file output dinamis (safeName.zip), kita ambil value pertama dari object output
-            const outputBuffer = Object.values(output)[0];
+            if (!outputBuffer) {
+                throw new Error("Mapshaper selesai, tetapi tidak menghasilkan file output.");
+            }
 
             return {
-                filename: `${safeName}.zip`,
+                filename: zipFileName,
                 mimeType: 'application/zip',
                 buffer: outputBuffer
             };
 
         } catch (error) {
             console.error("Mapshaper Error:", error);
-            // Mapshaper error message biasanya sangat jelas (misal: "Field name too long")
-            throw new Error("Gagal convert SHP via Mapshaper: " + error.message);
+            throw new Error(`Gagal convert SHP via Mapshaper: ${error.message || 'Unknown Error'}`);
         }
     }
 };
