@@ -18,7 +18,7 @@ import { getCategoryReport, getSubCategoryReport } from "../controllers/report.c
 const router = Router();
 
 router.post('/auth/login', validateLogin, authController.handleLogin)
-router.get('/report', checkJwt(), getAssetReport)
+router.get('/report',  getAssetReport)
 
 router.get('/category', getCategoryReport)
 router.get('/sub-category', getSubCategoryReport)
@@ -26,9 +26,9 @@ router.get('/sub-category', getSubCategoryReport)
 router.use('/layer', layerRouter)
 router.use('/feature', featureRouter)
 router.use('/attachment', checkJwt(), attachmentRoutes);
-router.use('/layer-schema', layerSchemaRoute)
-router.use('/user', checkJwt(), attachCurrentUser, checkRole(['admin']), userRoute)
-router.use('/role', checkJwt(), attachCurrentUser, checkRole(['admin']), roleRoute)
+router.use('/layer-schema', checkJwt(), attachCurrentUser, checkRole(['Admin']), layerSchemaRoute)
+router.use('/user', checkJwt(), attachCurrentUser, checkRole(['Admin']), userRoute)
+router.use('/role', checkJwt(), attachCurrentUser, checkRole(['Admin']), roleRoute)
 
 
 // for dev tool
