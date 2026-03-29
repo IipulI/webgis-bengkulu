@@ -8,9 +8,10 @@ export const downloadLayerShp = async (req, res, next) => {
         const { filename, buffer } = await exportService.exportLayerData(id, format);
 
         // Header agar browser tahu ini file download
+        const fileBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
 
         // Kirim binary data
         res.send(buffer);

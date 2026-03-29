@@ -32,6 +32,14 @@ const cleanValue = (val) => {
     return val;
 };
 
+const formatGeomType = (type) => {
+    const t = type.toUpperCase();
+    if (t === 'POINT') return 'Point';
+    if (t === 'LINESTRING' || t === 'LINE') return 'LineString';
+    if (t === 'POLYGON') return 'Polygon';
+    return type;
+};
+
 /**
  * Membuang koordinat Z (3D) menjadi 2D [x, y].
  * Library shp-write terkadang gagal menulis geometri 3D, menyebabkan mismatch.
@@ -109,7 +117,7 @@ export const exportLayerData = async (layerId, format = 'shp') => {
 
             // 2. Sanitasi Geometri (3D -> 2D)
             const cleanGeom = {
-                type: plain.geom.type,
+                type: formatGeomType(plain.geom.type),
                 coordinates: stripZ(plain.geom.coordinates)
             };
 
@@ -242,16 +250,30 @@ export const exportLayerData = async (layerId, format = 'shp') => {
             // 5. Ambil Buffer ZIP dari output
             // Panggil nama file secara eksplisit untuk mencegah salah ambil data log
             const zipFileName = `${safeName}.zip`;
-            const outputBuffer = output[zipFileName] || Object.values(output)[0];
+            const rawOutput = output[zipFileName] || Object.values(output)[0];
 
-            if (!outputBuffer) {
+            // --- PASTE THIS DEBUG BLOCK ---
+            console.log("=== MAPSHAPER OUTPUT KEYS ===");
+            console.log(Object.keys(output));
+            console.log("Target Zip Name:", zipFileName);
+            if (output[zipFileName]) {
+                console.log("Zip Buffer Size:", output[zipFileName].length);
+            } else {
+                console.log("CRITICAL: ZIP FILE WAS NOT GENERATED!");
+            }
+            // ------------------------------
+
+            if (!rawOutput) {
                 throw new Error("Mapshaper selesai, tetapi tidak menghasilkan file output.");
             }
+
+            // Pastikan output menjadi Node Buffer sejati
+            const finalBuffer = Buffer.isBuffer(rawOutput) ? rawOutput : Buffer.from(rawOutput);
 
             return {
                 filename: zipFileName,
                 mimeType: 'application/zip',
-                buffer: outputBuffer
+                buffer: finalBuffer
             };
 
         } catch (error) {

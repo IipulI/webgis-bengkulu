@@ -19,7 +19,7 @@ export const getLayer = async () => {
     }
 }
 
-export const getLayerDetailDashboard = async (id, page, size) => {
+export const getLayerDetailDashboard = async (id, search, page, size) => {
     const isPaginated = page != null && size != null;
     const { limit, offset } = getPagination(page, size);
 
@@ -34,6 +34,13 @@ export const getLayerDetailDashboard = async (id, page, size) => {
         }
     })
 
+    let searchWhere = {}
+    if (search !== null) {
+        searchWhere.name = {
+            [Op.iLike]: '%' + search + '%'
+        }
+    }
+
     let TargetModel;
     if (layer.geometryType === 'POINT') TargetModel = SpatialPoint;
     else if (layer.geometryType === 'LINE') TargetModel = SpatialLine;
@@ -42,7 +49,10 @@ export const getLayerDetailDashboard = async (id, page, size) => {
 
     try {
         const itemQuery = {
-            where: { layerId: id },
+            where: {
+                ...searchWhere,
+                layerId: id
+            },
             include: [{
                 model: FeatureAttachment,
                 as: "attachments",

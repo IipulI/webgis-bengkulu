@@ -21,12 +21,13 @@ export const getLayers = async (req, res, next) => {
 
 export const getDetailLayer = async (req, res, next) => {
     const { id } = req.params;
+    const search = req.query.search ? req.query.search : null;
     const page = req.query.page ? parseInt(req.query.page) : null;
     const size = req.query.size ? parseInt(req.query.size) : null;
     const responseBuilder = new ResponseBuilder(res);
 
     try {
-        const data = await layerService.getLayerDetailDashboard(id, page, size)
+        const data = await layerService.getLayerDetailDashboard(id, search, page, size)
 
         let payload;
         if (data.isPaginated) {

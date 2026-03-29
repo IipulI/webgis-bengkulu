@@ -307,7 +307,7 @@ const FIXED_TAXONOMY = [
         name: "Jaringan Jalan dan Jembatan",
         slug: "jaringan-jalan-dan-jembatan",
         subs: [
-            { name: "Jaringan Jalan", slug: "jaringan-jalan", unit: "kilometer" },
+            { name: "Jaringan Jalan", slug: "jaringan-jalan", unit: "meter" },
             { name: "Jembatan", slug: "jembatan", unit: "unit" },
         ]
     },
@@ -315,7 +315,7 @@ const FIXED_TAXONOMY = [
         name: "Drainase Perkotaan dan Pengendalian Banjir",
         slug: "drainase-perkotaan-dan-pengendalian-banjir",
         subs: [
-            { name: "Drainase Perkotaan", slug: "drainase-perkotaan", unit: "unit" },
+            { name: "Drainase Perkotaan", slug: "drainase-perkotaan", unit: "meter" },
             { name: "Pengendalian Banjir", slug: "pengendalian-banjir", unit: "unit" }
         ]
     },
@@ -324,14 +324,14 @@ const FIXED_TAXONOMY = [
         slug: "bangunan-sumber-daya-air-dan-irigasi",
         subs: [
             { name: "Bangunan Sumber Daya Air", slug: "bangunan-sumber-daya-air", unit: "unit" },
-            { name: "Irigasi", slug: "irigasi", unit: "kilometer" },
+            { name: "Irigasi", slug: "irigasi", unit: "meter" },
         ]
     },
     {
         name: "Jaringan Air Minum",
         slug: "jaringan-air-minum",
         subs: [
-            { name: "Jaringan Air Minum", slug: "jaringan-air-minum", unit: "kilometer" }
+            { name: "Jaringan Air Minum", slug: "jaringan-air-minum", unit: "meter" }
         ]
     },
     {
