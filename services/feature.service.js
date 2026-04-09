@@ -300,7 +300,8 @@ const FIXED_TAXONOMY = [
         name: "Bangunan Gedung",
         slug: "bangunan-gedung",
         subs: [
-            { name: "Bangunan Gedung", slug: "bangunan-gedung", unit: "unit" }
+            { name: "Bangunan Gedung", slug: "bangunan-gedung", unit: "unit" },
+            { name: "Total Luas Bangunan", slug: "total-luas-bangunan", unit: "hektar" }
         ]
     },
     {
@@ -352,13 +353,12 @@ export const getAssetsByCategory = async () => {
     const taxonomyMap = {};
 
     responseSkeleton.forEach(cat => {
-        // PERBAIKAN: Kita butuh dua counter terpisah di level Parent
-        cat.accumulated_value = 0; // Untuk menampung (Km + Unit)
-        cat.total_records = 0;     // Untuk menampung jumlah baris data (153 + 25)
+        cat.accumulated_value = 0;
+        cat.total_records = 0;
 
         cat.subs.forEach(sub => {
-            sub.items_count = 0;   // Jumlah baris (Record Count)
-            sub.smart_value = 0;   // Nilai berdasarkan unit (Km atau Unit)
+            sub.items_count = 0;
+            sub.smart_value = 0;
             sub.layers_count = 0;
 
             const key = `${cat.slug}:${sub.slug}`;
@@ -380,8 +380,6 @@ export const getAssetsByCategory = async () => {
     });
 
     const layerMetaMap = {};
-    // Kita tidak perlu memisah count/sum bucket lagi.
-    // Cukup pisah berdasarkan geometri saja.
     const idsByGeo = { POINT: [], LINE: [], POLYGON: [] };
 
     for (const layer of layers) {
@@ -396,28 +394,24 @@ export const getAssetsByCategory = async () => {
     }
 
     // ---------------------------------------------------------
-    // STEP 3: HYBRID QUERY (COUNT + SUM SEKALIGUS)
+    // STEP 3: HYBRID QUERY (COUNT + SUM PANJANG + SUM LUAS)
     // ---------------------------------------------------------
     const queryPromises = [];
 
-    // Fungsi helper query yang lebih pintar
     const pushHybridQuery = (Model, ids) => {
         if (ids.length === 0) return;
 
-        // Logic SUM JSONB (Postgres)
-        // Jika property 'panjang' tidak ada, hasilnya null -> di-COALESCE jadi 0.
-        // Jadi aman dijalankan untuk layer yang tidak punya panjang sekalipun.
-        const sumLiteral = Sequelize.literal(
-            `COALESCE(CAST("properties"->>'panjang' AS FLOAT), 0)`
-        );
+        // PERBAIKAN: Kita ambil dua metrik SUM sekaligus dari JSONB
+        // Pastikan key 'luas' sesuai dengan nama property di GeoJSON Anda (bisa 'luas_bangunan' dsb)
+        const sumPanjangLiteral = Sequelize.literal(`COALESCE(CAST("properties"->>'panjang' AS FLOAT), 0)`);
+        const sumLuasLiteral = Sequelize.literal(`COALESCE(CAST("properties"->>'luasBangunan' AS FLOAT), 0)`);
 
         queryPromises.push(Model.findAll({
             attributes: [
                 'layerId',
-                // 1. Selalu ambil COUNT
                 [Sequelize.fn('COUNT', Sequelize.col('id')), 'count_val'],
-                // 2. Selalu ambil SUM (biar nanti logic JS yang milih mau pakai yang mana)
-                [Sequelize.fn('SUM', sumLiteral), 'sum_val']
+                [Sequelize.fn('SUM', sumPanjangLiteral), 'sum_panjang'],
+                [Sequelize.fn('SUM', sumLuasLiteral), 'sum_luas'] // Tambahan query Luas
             ],
             where: { layerId: { [Op.in]: ids } },
             group: ['layerId'],
@@ -425,9 +419,8 @@ export const getAssetsByCategory = async () => {
         }));
     };
 
-    // Eksekusi Query
     pushHybridQuery(SpatialPoint, idsByGeo.POINT);
-    pushHybridQuery(SpatialLine, idsByGeo.LINE);      // Target utama (Jalan)
+    pushHybridQuery(SpatialLine, idsByGeo.LINE);
     pushHybridQuery(SpatialPolygon, idsByGeo.POLYGON);
 
     const allResults = (await Promise.all(queryPromises)).flat();
@@ -437,7 +430,8 @@ export const getAssetsByCategory = async () => {
     // ---------------------------------------------------------
     for (const item of allResults) {
         const countVal = parseInt(item.count_val || 0, 10);
-        let sumVal = parseFloat(item.sum_val || 0);
+        let sumPanjang = parseFloat(item.sum_panjang || 0);
+        let sumLuas = parseFloat(item.sum_luas || 0);
 
         const meta = layerMetaMap[item.layerId];
         if (meta) {
@@ -445,52 +439,51 @@ export const getAssetsByCategory = async () => {
             const target = taxonomyMap[mapKey];
 
             if (target) {
-                // 1. Update Sub-Category Stats
+                // 1. Update Sub-Category Normal (misal: Unit Bangunan)
                 target.subRef.items_count += countVal;
                 target.subRef.layers_count += 1;
 
-                // Hitung nilai satuan (Km vs Unit)
                 const isLengthUnit = ['kilometer', 'meter', 'm', 'km'].includes(target.unit.toLowerCase());
-                let valueForUnit = isLengthUnit ? parseFloat(sumVal.toFixed(2)) : countVal;
+                let valueForUnit = isLengthUnit ? parseFloat(sumPanjang.toFixed(2)) : countVal;
 
                 target.subRef.smart_value = (target.subRef.smart_value || 0) + valueForUnit;
 
-                // 2. Update PARENT Category Stats (PERBAIKAN DISINI)
-
-                // A. Akumulasi Record (Agar totalnya 178, bukan 113ribu)
+                // 2. Update PARENT Category
                 target.categoryRef.total_records += countVal;
-
-                // B. Akumulasi Value (Tetap kita simpan jika butuh total 'mixed')
                 target.categoryRef.accumulated_value += valueForUnit;
+
+                // 3. INJEKSI VIRTUAL: Jika layer ini adalah Bangunan Gedung
+                if (meta.cat === 'bangunan-gedung' && meta.sub === 'bangunan-gedung') {
+                    const luasTarget = taxonomyMap['bangunan-gedung:total-luas-bangunan'];
+                    if (luasTarget) {
+                        luasTarget.subRef.items_count += countVal;
+                        luasTarget.subRef.layers_count += 1;
+                        // Lempar hasil SUM Luas ke smart_value sub-kategori virtual ini
+                        luasTarget.subRef.smart_value = (luasTarget.subRef.smart_value || 0) + sumLuas;
+
+                        // CATATAN: Kita TIDAK menambahkan ke total_records parent lagi
+                        // agar tidak terjadi perhitungan ganda (double count) di parent.
+                    }
+                }
             }
         }
     }
 
     // ---------------------------------------------------------
-    // STEP 5: FINAL MAPPING (Backend -> Frontend Structure)
+    // STEP 5: FINAL MAPPING
     // ---------------------------------------------------------
     return responseSkeleton.map(cat => ({
         category: cat.name,
         slug: cat.slug,
-
-        // --- PERBAIKAN UTAMA DI SINI ---
-
-        // 1. total_assets: Sekarang berisi jumlah RECORD (153 + 25 = 178)
         total_assets: cat.total_records,
-
-        // 2. unit_counts: Berisi total nilai campuran (113146 + 25 = 113171)
-        // (Ini opsional, kalau tidak butuh di parent, bisa dihapus)
         unit_counts: parseFloat(cat.accumulated_value.toFixed(2)),
 
         sub_categories: cat.subs.map(sub => ({
             name: sub.name,
             slug: sub.slug,
             unit: sub.unit,
-
-            // Sub-category tetap konsisten:
-            total_assets: sub.items_count, // Jumlah Record (misal: 153)
-            unit_counts: parseFloat((sub.smart_value || 0).toFixed(2)), // Nilai Unit (misal: 113146.52)
-
+            total_assets: sub.items_count,
+            unit_counts: parseFloat((sub.smart_value || 0).toFixed(2)),
             layers_count: sub.layers_count
         }))
     }));
